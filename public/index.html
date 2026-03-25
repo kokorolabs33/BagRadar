@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BagRadar - Solana Token Roaster</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: #0a0a0a;
+      color: #fff;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .header h1 {
+      font-size: 36px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #f97316, #ef4444);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .header p {
+      color: #888;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+
+    /* Input area */
+    .input-area {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    .input-area input {
+      flex: 1;
+      padding: 14px 18px;
+      border-radius: 12px;
+      border: 1px solid #333;
+      background: #141414;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .input-area input:focus { border-color: #f97316; }
+    .input-area input::placeholder { color: #555; }
+    .btn {
+      padding: 14px 28px;
+      border-radius: 12px;
+      border: none;
+      background: #f97316;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      white-space: nowrap;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Status */
+    .status {
+      text-align: center;
+      padding: 20px;
+      color: #888;
+      font-size: 14px;
+    }
+    .status .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #333;
+      border-top-color: #f97316;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Stage card */
+    .stage-card {
+      background: #141414;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+      border: 1px solid #222;
+    }
+    .stage-card h3 {
+      font-size: 16px;
+      margin-bottom: 16px;
+      color: #ccc;
+    }
+    .data-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .data-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .data-item .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot.ok { background: #22c55e; }
+    .dot.missing { background: #ef4444; }
+    .data-item .label { color: #888; }
+    .data-item .value { color: #fff; font-weight: 500; }
+
+    /* Links input */
+    .links-section {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #222;
+    }
+    .links-section p {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 12px;
+    }
+    .link-input {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .link-input label {
+      width: 70px;
+      font-size: 12px;
+      color: #666;
+      padding-top: 10px;
+      text-align: right;
+    }
+    .link-input input {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #333;
+      background: #1a1a1a;
+      color: #fff;
+      font-size: 13px;
+      outline: none;
+    }
+    .link-input input:focus { border-color: #f97316; }
+
+    /* Roast result */
+    .roast-result {
+      background: #141414;
+      border-radius: 16px;
+      padding: 28px;
+      margin-top: 24px;
+      border: 1px solid #222;
+    }
+    .tier-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 24px;
+      font-weight: 700;
+      font-size: 18px;
+      margin-bottom: 12px;
+    }
+    .verdict {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      text-transform: uppercase;
+    }
+    .roast-text {
+      font-size: 14px;
+      line-height: 1.7;
+      color: #ccc;
+      white-space: pre-wrap;
+    }
+    .share-line {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid #222;
+      font-size: 13px;
+      color: #888;
+    }
+
+    /* Stats bar */
+    .stats-bar {
+      display: flex;
+      gap: 8px;
+      margin: 16px 0;
+      flex-wrap: wrap;
+    }
+    .stat {
+      background: #1a1a1a;
+      border-radius: 8px;
+      padding: 10px 14px;
+      flex: 1;
+      min-width: 100px;
+    }
+    .stat-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    .stat-value {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    /* Token header */
+    .token-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .token-header img {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #1a1a1a;
+    }
+    .token-header .placeholder-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #1a1a1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 700;
+    }
+    .token-name { font-size: 24px; font-weight: 700; }
+    .token-symbol { font-size: 14px; color: #888; }
+
+    .hidden { display: none; }
+    .error-text { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>BAGRADAR</h1>
+      <p>Paste a Solana token address. We'll tell you what kind of bag you're holding.</p>
+    </div>
+
+    <div class="input-area">
+      <input type="text" id="mintInput" placeholder="Token contract address (CA)" />
+      <button class="btn" id="analyzeBtn">Analyze</button>
+    </div>
+
+    <div id="status" class="status hidden"></div>
+
+    <div id="stage1" class="hidden">
+      <div class="stage-card">
+        <h3>Data Collected</h3>
+        <div id="dataGrid" class="data-grid"></div>
+        <div class="links-section">
+          <p>Missing links? Add them for a deeper analysis:</p>
+          <div class="link-input">
+            <label>Twitter</label>
+            <input type="text" id="linkTwitter" placeholder="https://twitter.com/..." />
+          </div>
+          <div class="link-input">
+            <label>Website</label>
+            <input type="text" id="linkWebsite" placeholder="https://..." />
+          </div>
+          <div class="link-input">
+            <label>GitHub</label>
+            <input type="text" id="linkGithub" placeholder="https://github.com/..." />
+          </div>
+          <div style="margin-top: 16px; text-align: right;">
+            <button class="btn" id="roastBtn">Roast It</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="roastResult" class="hidden">
+      <div class="roast-result">
+        <div id="tokenHeader" class="token-header"></div>
+        <div id="tierBadge" class="tier-badge"></div>
+        <div id="verdict" class="verdict"></div>
+        <div id="statsBar" class="stats-bar"></div>
+        <div id="roastText" class="roast-text"></div>
+        <div id="shareLine" class="share-line"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = '';
+    let currentAnalysis = null;
+
+    function show(id) { document.getElementById(id).classList.remove('hidden'); }
+    function hide(id) { document.getElementById(id).classList.add('hidden'); }
+
+    function setStatus(msg, loading) {
+      const el = document.getElementById('status');
+      el.textContent = '';
+      if (loading) {
+        const spinner = document.createElement('span');
+        spinner.className = 'spinner';
+        el.appendChild(spinner);
+      }
+      el.appendChild(document.createTextNode(msg));
+      show('status');
+    }
+
+    function setError(msg) {
+      const el = document.getElementById('status');
+      el.textContent = '';
+      const span = document.createElement('span');
+      span.className = 'error-text';
+      span.textContent = msg;
+      el.appendChild(span);
+      show('status');
+    }
+
+    function formatNum(n) {
+      if (n >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
+      if (n >= 1e3) return '$' + (n / 1e3).toFixed(1) + 'K';
+      if (n >= 1) return '$' + n.toFixed(2);
+      return '$' + n.toFixed(6);
+    }
+
+    function createDataItem(label, value, ok) {
+      const div = document.createElement('div');
+      div.className = 'data-item';
+
+      const dot = document.createElement('span');
+      dot.className = 'dot ' + (ok ? 'ok' : 'missing');
+      div.appendChild(dot);
+
+      const labelSpan = document.createElement('span');
+      labelSpan.className = 'label';
+      labelSpan.textContent = label + ':';
+      div.appendChild(labelSpan);
+
+      const valueSpan = document.createElement('span');
+      valueSpan.className = 'value';
+      valueSpan.textContent = value || 'Not found';
+      div.appendChild(valueSpan);
+
+      return div;
+    }
+
+    function createStat(label, value, color) {
+      const div = document.createElement('div');
+      div.className = 'stat';
+
+      const labelDiv = document.createElement('div');
+      labelDiv.className = 'stat-label';
+      labelDiv.textContent = label;
+      div.appendChild(labelDiv);
+
+      const valueDiv = document.createElement('div');
+      valueDiv.className = 'stat-value';
+      valueDiv.textContent = value;
+      if (color) valueDiv.style.color = color;
+      div.appendChild(valueDiv);
+
+      return div;
+    }
+
+    // Stage 1: Analyze
+    async function startAnalysis() {
+      const mint = document.getElementById('mintInput').value.trim();
+      if (!mint) return;
+
+      document.getElementById('analyzeBtn').disabled = true;
+      hide('stage1');
+      hide('roastResult');
+      setStatus('Aggregating on-chain data...', true);
+
+      try {
+        const res = await fetch(API + '/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mint: mint }),
+        });
+        if (!res.ok) throw new Error('API error: ' + res.status);
+        currentAnalysis = await res.json();
+        renderStage1(currentAnalysis);
+        hide('status');
+        show('stage1');
+      } catch (err) {
+        setError('Error: ' + err.message);
+      } finally {
+        document.getElementById('analyzeBtn').disabled = false;
+      }
+    }
+
+    function renderStage1(a) {
+      const grid = document.getElementById('dataGrid');
+      grid.textContent = '';
+
+      var items = [
+        ['Name', a.name, !!a.name],
+        ['Symbol', a.symbol, !!a.symbol],
+        ['Price', a.market ? formatNum(a.market.priceUsd) : null, !!a.market],
+        ['Market Cap', a.market ? formatNum(a.market.marketCap) : null, !!a.market],
+        ['Volume 24h', a.market ? formatNum(a.market.volume24h) : null, !!a.market],
+        ['Holders', a.holders ? 'Top10: ' + a.holders.top10Pct.toFixed(0) + '%' : null, !!a.holders],
+        ['Risk Score', a.risk ? a.risk.scoreNormalised + '/10' : null, !!a.risk],
+        ['Creator', a.creator ? a.creator.username : null, !!a.creator],
+        ['Twitter', a.socials && a.socials.twitter ? 'Found' : null, !!(a.socials && a.socials.twitter)],
+        ['Website', a.socials && a.socials.website ? 'Found' : null, !!(a.socials && a.socials.website)],
+      ];
+
+      items.forEach(function(item) {
+        grid.appendChild(createDataItem(item[0], item[1], item[2]));
+      });
+
+      // Pre-fill discovered links
+      if (a.socials && a.socials.twitter) document.getElementById('linkTwitter').value = a.socials.twitter;
+      if (a.socials && a.socials.website) document.getElementById('linkWebsite').value = a.socials.website;
+    }
+
+    // Stage 2 + 3: Scrape + Roast
+    async function startRoast() {
+      if (!currentAnalysis) return;
+
+      document.getElementById('roastBtn').disabled = true;
+
+      var twitter = document.getElementById('linkTwitter').value.trim() || null;
+      var website = document.getElementById('linkWebsite').value.trim() || null;
+      var github = document.getElementById('linkGithub').value.trim() || null;
+
+      try {
+        setStatus('Scraping links...', true);
+        var scrapeRes = await fetch(API + '/api/scrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ twitter: twitter, website: website, github: github }),
+        });
+        var scraped = await scrapeRes.json();
+
+        setStatus('Generating roast...', true);
+        var roastRes = await fetch(API + '/api/roast', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ analysis: currentAnalysis, scraped: scraped }),
+        });
+        if (!roastRes.ok) throw new Error('Roast API error: ' + roastRes.status);
+        var roast = await roastRes.json();
+
+        renderRoast(currentAnalysis, roast);
+        hide('status');
+        show('roastResult');
+      } catch (err) {
+        setError('Error: ' + err.message);
+      } finally {
+        document.getElementById('roastBtn').disabled = false;
+      }
+    }
+
+    function renderRoast(analysis, roast) {
+      // Token header
+      var headerEl = document.getElementById('tokenHeader');
+      headerEl.textContent = '';
+
+      if (analysis.imageUrl) {
+        var img = document.createElement('img');
+        img.src = analysis.imageUrl;
+        img.alt = analysis.name || '';
+        headerEl.appendChild(img);
+      } else {
+        var placeholder = document.createElement('div');
+        placeholder.className = 'placeholder-icon';
+        placeholder.textContent = (analysis.symbol || '?')[0];
+        headerEl.appendChild(placeholder);
+      }
+
+      var nameBlock = document.createElement('div');
+      var nameDiv = document.createElement('div');
+      nameDiv.className = 'token-name';
+      nameDiv.textContent = analysis.name || 'Unknown';
+      nameBlock.appendChild(nameDiv);
+      var symDiv = document.createElement('div');
+      symDiv.className = 'token-symbol';
+      symDiv.textContent = '$' + (analysis.symbol || '???');
+      nameBlock.appendChild(symDiv);
+      headerEl.appendChild(nameBlock);
+
+      // Tier badge
+      var tier = roast.bagTier;
+      var badgeEl = document.getElementById('tierBadge');
+      badgeEl.textContent = tier.emoji + ' ' + tier.label;
+      badgeEl.style.background = tier.color + '22';
+      badgeEl.style.border = '2px solid ' + tier.color;
+      badgeEl.style.color = tier.color;
+
+      // Verdict
+      var verdictEl = document.getElementById('verdict');
+      verdictEl.textContent = roast.verdict;
+      verdictEl.style.color = tier.color;
+
+      // Stats
+      var statsEl = document.getElementById('statsBar');
+      statsEl.textContent = '';
+      var m = analysis.market;
+      var stats = [
+        ['Price', m ? formatNum(m.priceUsd) : 'N/A', null],
+        ['MCap', m ? formatNum(m.marketCap) : 'N/A', null],
+        ['24h Vol', m ? formatNum(m.volume24h) : 'N/A', null],
+        ['24h', m ? (m.priceChange24h > 0 ? '+' : '') + m.priceChange24h.toFixed(1) + '%' : 'N/A',
+          m ? (m.priceChange24h >= 0 ? '#22c55e' : '#ef4444') : '#888'],
+        ['Risk', roast.riskScore + '/100', tier.color],
+      ];
+      stats.forEach(function(s) {
+        statsEl.appendChild(createStat(s[0], s[1], s[2]));
+      });
+
+      // Roast text
+      document.getElementById('roastText').textContent = roast.roast;
+
+      // Share line
+      document.getElementById('shareLine').textContent = roast.shareLine;
+    }
+
+    // Event listeners
+    document.getElementById('analyzeBtn').addEventListener('click', startAnalysis);
+    document.getElementById('roastBtn').addEventListener('click', startRoast);
+    document.getElementById('mintInput').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') startAnalysis();
+    });
+  </script>
+</body>
+</html>

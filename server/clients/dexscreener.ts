@@ -53,6 +53,11 @@ export interface RawPair {
   fdv?: number;
   pairCreatedAt?: number;
   url?: string;
+  info?: {
+    imageUrl?: string;
+    websites?: Array<{ url: string; label: string }>;
+    socials?: Array<{ url: string; type: string }>;
+  };
 }
 
 // Parsed, normalised pair data for use inside BagRadar
@@ -74,6 +79,8 @@ export interface PairData {
   fdv: number;
   pairCreatedAt: number | null;
   url: string;
+  websites: Array<{ url: string; label: string }>;
+  socials: Array<{ url: string; type: string }>;
 }
 
 function rawToPairData(rp: RawPair): PairData {
@@ -94,6 +101,8 @@ function rawToPairData(rp: RawPair): PairData {
     fdv: rp.fdv ?? 0,
     pairCreatedAt: rp.pairCreatedAt ?? null,
     url: rp.url ?? "",
+    websites: rp.info?.websites ?? [],
+    socials: rp.info?.socials ?? [],
   };
 }
 
