@@ -1,2 +1,5 @@
 .env
 docs/
+node_modules/
+dist/
+frontend/dist/
