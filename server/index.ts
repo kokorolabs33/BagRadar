@@ -451,7 +451,7 @@ app.use("/*", serveStatic({ root: "./public" }));
     console.error("[db] Init failed:", err);
   }
 
-  serve({ fetch: app.fetch, port: env.port }, (info) => {
-    console.log(`BagRadar API running on http://localhost:${info.port}`);
+  serve({ fetch: app.fetch, hostname: "0.0.0.0", port: env.port }, (info) => {
+    console.log(`BagRadar API running on http://0.0.0.0:${info.port}`);
   });
 })();
