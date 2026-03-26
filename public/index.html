@@ -388,6 +388,41 @@
     }
     .no-wallet a { color: #f97316; text-decoration: none; }
     .no-wallet a:hover { text-decoration: underline; }
+
+    /* ─── Mobile ─────────────────────────────────────────── */
+    @media (max-width: 520px) {
+      .container { padding: 24px 16px; }
+      .header { margin-bottom: 32px; padding-top: 12px; }
+      .header h1 { font-size: 32px; letter-spacing: 2px; }
+      .header .tagline { font-size: 15px; }
+      .header .desc { font-size: 13px; }
+      .tier-scale-item { padding: 10px 2px; }
+      .tier-scale-item .tier-label { font-size: 9px; }
+      .tier-scale-item .tier-desc { font-size: 8px; }
+
+      .input-area { flex-direction: column; }
+      .input-area input { font-size: 14px; padding: 14px 16px; }
+      .btn { padding: 14px 24px; font-size: 14px; }
+
+      .data-grid { grid-template-columns: 1fr; gap: 8px; }
+      .data-item { font-size: 12px; }
+      .data-item .value { word-break: break-all; }
+
+      .stage-card { padding: 16px; }
+
+      .link-input { flex-direction: column; gap: 4px; }
+      .link-input label { width: auto; text-align: left; padding-top: 0; font-size: 11px; }
+      .link-input input { font-size: 12px; }
+
+      #paymentSection { flex-direction: column; gap: 12px; align-items: stretch !important; }
+      #paymentSection .btn { text-align: center; }
+
+      .roast-result { padding: 16px; }
+      .verdict { font-size: 16px; }
+      .roast-text { font-size: 13px; text-align: left; }
+
+      .modal { padding: 20px; }
+    }
   </style>
 </head>
 <body>
@@ -440,7 +475,7 @@
         <h3>Data Collected</h3>
         <div id="dataGrid" class="data-grid"></div>
         <div class="links-section">
-          <p>Missing links? Add them for a deeper analysis:</p>
+          <p id="linksHint">Missing links? Add them for a deeper analysis:</p>
           <div class="link-input">
             <label>Twitter</label>
             <input type="text" id="linkTwitter" placeholder="https://twitter.com/..." />
@@ -475,11 +510,9 @@
     </div>
 
     <div id="roastResult" class="hidden">
-      <div class="roast-result">
-        <div id="tokenHeader" class="token-header"></div>
-        <div id="tierBadge" class="tier-badge"></div>
+      <div class="roast-result" style="text-align: center;">
+        <img id="cardImage" style="width: 100%; max-width: 480px; border-radius: 16px; margin-bottom: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);" />
         <div id="verdict" class="verdict"></div>
-        <div id="statsBar" class="stats-bar"></div>
         <div id="roastText" class="roast-text"></div>
         <div id="shareLine" class="share-line"></div>
         <div style="margin-top: 20px;">
@@ -615,6 +648,15 @@
       const grid = document.getElementById('dataGrid');
       grid.textContent = '';
 
+      // Reset link inputs visibility
+      document.querySelectorAll('.link-input').forEach(function(el) { el.style.display = ''; });
+      document.getElementById('linkTwitter').value = '';
+      document.getElementById('linkWebsite').value = '';
+      document.getElementById('linkGithub').value = '';
+
+      var hasTwitter = !!(a.socials && a.socials.twitter);
+      var hasWebsite = !!(a.socials && a.socials.website);
+
       var items = [
         ['Name', a.name, !!a.name],
         ['Symbol', a.symbol, !!a.symbol],
@@ -622,22 +664,31 @@
         ['Market Cap', a.market ? formatNum(a.market.marketCap) : null, !!a.market],
         ['Volume 24h', a.market ? formatNum(a.market.volume24h) : null, !!a.market],
         ['Holders', a.holders ? 'Top10: ' + a.holders.top10Pct.toFixed(0) + '%' : null, !!a.holders],
-        ['Risk Score', a.risk ? a.risk.scoreNormalised + '/10' : null, !!a.risk],
+        ['GitHub', null, false],
         ['Creator', a.creator ? a.creator.username : null, !!a.creator],
-        ['Twitter', a.socials && a.socials.twitter ? 'Found' : null, !!(a.socials && a.socials.twitter)],
-        ['Website', a.socials && a.socials.website ? 'Found' : null, !!(a.socials && a.socials.website)],
+        ['Twitter', hasTwitter ? a.socials.twitter : null, hasTwitter],
+        ['Website', hasWebsite ? a.socials.website : null, hasWebsite],
       ];
 
       items.forEach(function(item) {
         grid.appendChild(createDataItem(item[0], item[1], item[2]));
       });
 
-      // Pre-fill discovered links from DexScreener
-      if (a.socials && a.socials.twitter) document.getElementById('linkTwitter').value = a.socials.twitter;
-      if (a.socials && a.socials.website) document.getElementById('linkWebsite').value = a.socials.website;
+      // Pre-fill discovered links and hide inputs for found links
+      if (hasTwitter) {
+        document.getElementById('linkTwitter').value = a.socials.twitter;
+        document.getElementById('linkTwitter').closest('.link-input').style.display = 'none';
+      }
+      if (hasWebsite) {
+        document.getElementById('linkWebsite').value = a.socials.website;
+        document.getElementById('linkWebsite').closest('.link-input').style.display = 'none';
+      }
+
+      // Check if all links are found — hide the whole section header if so
+      var anyMissing = !hasTwitter || !hasWebsite;
 
       // If we found a website, do a quick scrape to discover more links (GitHub etc)
-      if (a.socials && a.socials.website) {
+      if (hasWebsite) {
         fetch(API + '/api/scrape', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -647,9 +698,17 @@
             var d = scraped.website.discoveredLinks;
             if (d.twitter && !document.getElementById('linkTwitter').value) {
               document.getElementById('linkTwitter').value = d.twitter;
+              document.getElementById('linkTwitter').closest('.link-input').style.display = 'none';
             }
-            if (d.github && !document.getElementById('linkGithub').value) {
+            if (d.github) {
               document.getElementById('linkGithub').value = d.github;
+              document.getElementById('linkGithub').closest('.link-input').style.display = 'none';
+              // Update GitHub status in grid
+              var githubItem = grid.querySelectorAll('.data-item')[6];
+              if (githubItem) {
+                githubItem.querySelector('.dot').className = 'dot ok';
+                githubItem.querySelector('.value').textContent = d.github;
+              }
             }
           }
         });
@@ -833,61 +892,23 @@
     }
 
     function renderRoast(analysis, roast) {
-      // Token header
-      var headerEl = document.getElementById('tokenHeader');
-      headerEl.textContent = '';
-
-      if (analysis.imageUrl) {
-        var img = document.createElement('img');
-        img.src = analysis.imageUrl;
-        img.alt = analysis.name || '';
-        headerEl.appendChild(img);
-      } else {
-        var placeholder = document.createElement('div');
-        placeholder.className = 'placeholder-icon';
-        placeholder.textContent = (analysis.symbol || '?')[0];
-        headerEl.appendChild(placeholder);
-      }
-
-      var nameBlock = document.createElement('div');
-      var nameDiv = document.createElement('div');
-      nameDiv.className = 'token-name';
-      nameDiv.textContent = analysis.name || 'Unknown';
-      nameBlock.appendChild(nameDiv);
-      var symDiv = document.createElement('div');
-      symDiv.className = 'token-symbol';
-      symDiv.textContent = '$' + (analysis.symbol || '???');
-      nameBlock.appendChild(symDiv);
-      headerEl.appendChild(nameBlock);
-
-      // Tier badge
       var tier = roast.bagTier;
-      var badgeEl = document.getElementById('tierBadge');
-      badgeEl.textContent = tier.emoji + ' ' + tier.label;
-      badgeEl.style.background = tier.color + '22';
-      badgeEl.style.border = '2px solid ' + tier.color;
-      badgeEl.style.color = tier.color;
+
+      // Render card image via /api/card
+      fetch(API + '/api/card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ analysis: analysis, roast: roast }),
+      })
+        .then(function(res) { return res.blob(); })
+        .then(function(blob) {
+          document.getElementById('cardImage').src = URL.createObjectURL(blob);
+        });
 
       // Verdict
       var verdictEl = document.getElementById('verdict');
       verdictEl.textContent = roast.verdict;
       verdictEl.style.color = tier.color;
-
-      // Stats
-      var statsEl = document.getElementById('statsBar');
-      statsEl.textContent = '';
-      var m = analysis.market;
-      var stats = [
-        ['Price', m ? formatNum(m.priceUsd) : 'N/A', null],
-        ['MCap', m ? formatNum(m.marketCap) : 'N/A', null],
-        ['24h Vol', m ? formatNum(m.volume24h) : 'N/A', null],
-        ['24h', m ? (m.priceChange24h > 0 ? '+' : '') + m.priceChange24h.toFixed(1) + '%' : 'N/A',
-          m ? (m.priceChange24h >= 0 ? '#22c55e' : '#ef4444') : '#888'],
-        ['Risk', roast.riskScore + '/100', tier.color],
-      ];
-      stats.forEach(function(s) {
-        statsEl.appendChild(createStat(s[0], s[1], s[2]));
-      });
 
       // Roast text
       document.getElementById('roastText').textContent = roast.roast;
@@ -924,10 +945,11 @@
         var tier = currentRoast.bagTier;
         var name = currentAnalysis.name || 'Unknown';
         var symbol = currentAnalysis.symbol || '???';
-        var tweetText = tier.emoji + ' ' + name + ' ($' + symbol + ') rated: ' + tier.label + ' (' + currentRoast.riskScore + '/100)\n\n'
+        var tweetText = tier.emoji + ' ' + name + ' ($' + symbol + ') — ' + tier.label + ' | Risk Score: ' + currentRoast.riskScore + '/100\n\n'
           + '"' + currentRoast.verdict + '"\n\n'
           + shareData.shareUrl + '\n\n'
-          + 'Get your bag roasted @BagRadar_';
+          + 'Get your bag roasted at https://bagradar.kokorolabs33.com\n\n'
+          + '#Solana #BagRadar #BagsFM #Crypto';
         var url = 'https://x.com/intent/tweet?text=' + encodeURIComponent(tweetText);
         window.open(url, '_blank');
       } catch (err) {

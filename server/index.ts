@@ -20,15 +20,16 @@ import { renderCard } from "./card.js";
 import {
   getPaymentAmount,
   verifyPayment,
-  createSession,
-  validateSession,
 } from "./payment.js";
 import {
   initDb,
   saveShare,
   getShare,
   cleanExpiredShares,
+  cleanExpiredSessions,
   keepAlive,
+  createSession,
+  validateSession,
 } from "./db.js";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
@@ -249,7 +250,7 @@ app.post("/api/payment/verify", async (c) => {
   const result = await verifyPayment(body.signature, RPC_URL);
 
   if (result.valid && result.sessionToken) {
-    createSession(result.sessionToken, body.mint);
+    await createSession(result.sessionToken, body.mint);
   }
 
   return c.json(result);
@@ -274,7 +275,7 @@ app.post("/api/paid-roast", async (c) => {
     if (!body.sessionToken) {
       return c.json({ error: "sessionToken is required" }, 400);
     }
-    if (!validateSession(body.sessionToken, body.analysis.mint)) {
+    if (!(await validateSession(body.sessionToken, body.analysis.mint))) {
       return c.json({ error: "Invalid or expired session. Please pay again." }, 403);
     }
   }
@@ -404,6 +405,12 @@ app.get("/share/:id", async (c) => {
       transition: all 0.2s; letter-spacing: 0.5px;
     }
     .cta-btn:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 16px #f9731644; }
+    @media (max-width: 520px) {
+      .container { padding: 24px 16px; }
+      .verdict { font-size: 15px; }
+      .roast-text { font-size: 13px; }
+      .cta-btn { padding: 12px 24px; font-size: 14px; width: 100%; text-align: center; }
+    }
   </style>
 </head>
 <body>
@@ -427,28 +434,22 @@ app.use("/*", serveStatic({ root: "./public" }));
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 
-// Initialize DB + scheduled tasks, then start server
 (async () => {
-  try {
-    if (process.env.DATABASE_URL) {
-      await initDb();
+  if (process.env.DATABASE_URL) {
+    await initDb();
 
-      // Clean expired shares every hour
-      setInterval(async () => {
-        const n = await cleanExpiredShares();
-        if (n > 0) console.log(`[db] Cleaned ${n} expired shares`);
-      }, 60 * 60 * 1000);
+    setInterval(async () => {
+      const n = await cleanExpiredShares();
+      const s = await cleanExpiredSessions();
+      if (n + s > 0) console.log(`[db] Cleaned ${n} expired shares, ${s} expired sessions`);
+    }, 60 * 60 * 1000);
 
-      // Keep database alive — run once every 24h
-      setInterval(async () => {
-        await keepAlive();
-        console.log("[db] Keepalive ping sent");
-      }, 24 * 60 * 60 * 1000);
-    } else {
-      console.warn("[db] DATABASE_URL not set — share feature disabled");
-    }
-  } catch (err) {
-    console.error("[db] Init failed:", err);
+    setInterval(async () => {
+      await keepAlive();
+      console.log("[db] Keepalive ping sent");
+    }, 24 * 60 * 60 * 1000);
+  } else {
+    console.warn("[db] DATABASE_URL not set — share feature disabled");
   }
 
   serve({ fetch: app.fetch, hostname: "0.0.0.0", port: env.port }, (info) => {

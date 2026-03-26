@@ -138,24 +138,5 @@ export async function verifyPayment(
   return { valid: true, sessionToken };
 }
 
-// ─── Session management (in-memory for now) ──────────────────────────────────
-
-const sessions = new Map<string, { mint: string; createdAt: number }>();
-const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
-
-export function createSession(token: string, mint: string): void {
-  sessions.set(token, { mint, createdAt: Date.now() });
-}
-
-export function validateSession(token: string, mint: string): boolean {
-  const session = sessions.get(token);
-  if (!session) return false;
-  if (Date.now() - session.createdAt > SESSION_TTL_MS) {
-    sessions.delete(token);
-    return false;
-  }
-  if (session.mint !== mint) return false;
-  // One-time use: delete after validation
-  sessions.delete(token);
-  return true;
-}
+// ─── Session management (DB-backed, see db.ts) ──────────────────────────────
+// createSession and validateSession are now exported from db.ts

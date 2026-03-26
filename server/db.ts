@@ -30,11 +30,11 @@ function getPool(): pg.Pool {
     throw new Error("DATABASE_URL is required");
   }
 
-  pool = new Pool({ connectionString, max: 5 });
+  pool = new Pool({ connectionString, max: 5, connectionTimeoutMillis: 10_000 });
   return pool;
 }
 
-/** Ensure the shares table exists (called once at startup) */
+/** Ensure tables exist (called once at startup) */
 export async function initDb(): Promise<void> {
   const db = getPool();
   await db.query(`
@@ -44,8 +44,13 @@ export async function initDb(): Promise<void> {
       roast      jsonb NOT NULL,
       created_at timestamptz NOT NULL DEFAULT now()
     );
+    CREATE TABLE IF NOT EXISTS sessions (
+      token      text PRIMARY KEY,
+      mint       text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
   `);
-  console.log("[db] shares table ready");
+  console.log("[db] tables ready");
 }
 
 // ─── Share CRUD ───────────────────────────────────────────────────────────────
@@ -78,6 +83,40 @@ export async function getShare(id: string): Promise<ShareRow | null> {
     [id],
   );
   return res.rows[0] ?? null;
+}
+
+// ─── Sessions ─────────────────────────────────────────────────────────────────
+
+const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+export async function createSession(token: string, mint: string): Promise<void> {
+  const db = getPool();
+  await db.query(
+    `INSERT INTO sessions (token, mint) VALUES ($1, $2)`,
+    [token, mint],
+  );
+}
+
+/**
+ * Validate and consume a session token (one-time use).
+ * Returns true if valid, false otherwise.
+ */
+export async function validateSession(token: string, mint: string): Promise<boolean> {
+  const db = getPool();
+  const res = await db.query<{ token: string; mint: string; created_at: Date }>(
+    `DELETE FROM sessions WHERE token = $1 AND mint = $2 AND created_at > now() - interval '30 minutes' RETURNING token`,
+    [token, mint],
+  );
+  return (res.rowCount ?? 0) > 0;
+}
+
+/** Clean expired sessions (called by maintenance interval) */
+export async function cleanExpiredSessions(): Promise<number> {
+  const db = getPool();
+  const res = await db.query(
+    `DELETE FROM sessions WHERE created_at < now() - interval '30 minutes'`,
+  );
+  return res.rowCount ?? 0;
 }
 
 // ─── Maintenance ──────────────────────────────────────────────────────────────
