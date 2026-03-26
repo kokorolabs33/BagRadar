@@ -23,19 +23,94 @@
     /* Header */
     .header {
       text-align: center;
-      margin-bottom: 40px;
+      margin-bottom: 48px;
+      padding-top: 20px;
     }
     .header h1 {
-      font-size: 36px;
-      font-weight: 800;
-      background: linear-gradient(135deg, #f97316, #ef4444);
+      font-size: 48px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #f97316 0%, #ef4444 50%, #f97316 100%);
+      background-size: 200% 200%;
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+      letter-spacing: 4px;
+      animation: gradientShift 3s ease infinite;
     }
-    .header p {
-      color: #888;
-      margin-top: 8px;
-      font-size: 14px;
+    @keyframes gradientShift {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+    .header .tagline {
+      font-size: 18px;
+      color: #fff;
+      margin-top: 12px;
+      font-weight: 600;
+      animation: fadeInUp 0.6s ease;
+    }
+    .header .desc {
+      font-size: 15px;
+      color: #aaa;
+      margin-top: 12px;
+      max-width: 520px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.7;
+      animation: fadeInUp 0.8s ease;
+    }
+    .header .desc .highlight {
+      color: #f97316;
+      font-weight: 600;
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Tier scale bar */
+    .tier-scale {
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+      margin-top: 24px;
+      max-width: 520px;
+      margin-left: auto;
+      margin-right: auto;
+      border-radius: 12px;
+      overflow: hidden;
+      animation: fadeInUp 1s ease;
+    }
+    .tier-scale-item {
+      flex: 1;
+      padding: 12px 4px;
+      text-align: center;
+      position: relative;
+      transition: transform 0.2s, flex 0.3s;
+      cursor: default;
+    }
+    .tier-scale-item:hover {
+      transform: scaleY(1.08);
+      flex: 1.3;
+    }
+    .tier-scale-item .tier-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #fff;
+    }
+    .tier-scale-item .tier-desc {
+      font-size: 9px;
+      margin-top: 3px;
+      opacity: 0.7;
+      color: #fff;
+    }
+    .tier-scale-arrow {
+      display: flex;
+      justify-content: space-between;
+      max-width: 520px;
+      margin: 6px auto 0;
+      font-size: 10px;
+      color: #666;
     }
 
     /* Input area */
@@ -46,31 +121,38 @@
     }
     .input-area input {
       flex: 1;
-      padding: 14px 18px;
-      border-radius: 12px;
+      padding: 16px 20px;
+      border-radius: 14px;
       border: 1px solid #333;
       background: #141414;
       color: #fff;
-      font-size: 14px;
+      font-size: 15px;
       outline: none;
       transition: border-color 0.2s;
     }
-    .input-area input:focus { border-color: #f97316; }
+    .input-area input:focus { border-color: #f97316; box-shadow: 0 0 0 3px #f9731622; }
     .input-area input::placeholder { color: #555; }
     .btn {
-      padding: 14px 28px;
-      border-radius: 12px;
+      padding: 16px 32px;
+      border-radius: 14px;
       border: none;
-      background: #f97316;
+      background: linear-gradient(135deg, #f97316, #ea580c);
       color: #fff;
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 700;
       cursor: pointer;
-      transition: opacity 0.2s;
+      transition: all 0.2s;
+      letter-spacing: 0.5px;
       white-space: nowrap;
     }
-    .btn:hover { opacity: 0.9; }
-    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 16px #f9731644; }
+    .btn:active { transform: translateY(0); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+    #analyzeBtn { animation: fadeInUp 1.2s ease, pulse 2s ease-in-out 2s infinite; }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 #f9731644; }
+      50% { box-shadow: 0 0 0 8px #f9731600; }
+    }
 
     /* Status */
     .status {
@@ -252,7 +334,7 @@
     .token-name { font-size: 24px; font-weight: 700; }
     .token-symbol { font-size: 14px; color: #888; }
 
-    .hidden { display: none; }
+    .hidden { display: none !important; }
     .error-text { color: #ef4444; }
 
     /* Wallet modal */
@@ -312,12 +394,43 @@
   <div class="container">
     <div class="header">
       <h1>BAGRADAR</h1>
-      <p>Paste a Solana token address. We'll tell you what kind of bag you're holding.</p>
+      <p class="tagline">AI-Powered Solana Token Intelligence</p>
+      <p class="desc">
+        On-chain data, websites, GitHub, Twitter — we scrape it all and let AI deliver a
+        <span class="highlight">brutally honest verdict</span>.
+        Every token gets a Bag Tier rating.
+      </p>
+      <div class="tier-scale">
+        <div class="tier-scale-item" style="background:#3b82f6">
+          <div class="tier-label">Birkin</div>
+          <div class="tier-desc">Legit</div>
+        </div>
+        <div class="tier-scale-item" style="background:#22c55e">
+          <div class="tier-label">Solid</div>
+          <div class="tier-desc">Decent</div>
+        </div>
+        <div class="tier-scale-item" style="background:#eab308">
+          <div class="tier-label">Mystery</div>
+          <div class="tier-desc">Risky</div>
+        </div>
+        <div class="tier-scale-item" style="background:#f97316">
+          <div class="tier-label">Trash</div>
+          <div class="tier-desc">Danger</div>
+        </div>
+        <div class="tier-scale-item" style="background:#ef4444">
+          <div class="tier-label">Body</div>
+          <div class="tier-desc">Run</div>
+        </div>
+      </div>
+      <div class="tier-scale-arrow">
+        <span>SAFE</span>
+        <span>DANGER</span>
+      </div>
     </div>
 
     <div class="input-area">
-      <input type="text" id="mintInput" placeholder="Token contract address (CA)" />
-      <button class="btn" id="analyzeBtn">Analyze</button>
+      <input type="text" id="mintInput" placeholder="Paste token contract address (CA)" />
+      <button class="btn" id="analyzeBtn">Scan</button>
     </div>
 
     <div id="status" class="status hidden"></div>
@@ -376,11 +489,22 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/@solana/web3.js@1.98.0/lib/index.iife.min.js"></script>
+  <script src="/js/buffer.js"></script>
+  <script>window.Buffer = window.buffer.Buffer;</script>
+  <script src="/js/solana-web3.js"></script>
   <script>
     const API = '';
     let currentAnalysis = null;
     let paymentInfo = null;
+    var skipPayment = false;
+
+    // Check if payment is skipped (dev mode)
+    fetch(API + '/api/config').then(function(r) { return r.json(); }).then(function(cfg) {
+      skipPayment = cfg.skipPayment;
+      if (skipPayment) {
+        document.getElementById('roastBtn').textContent = 'Roast It (Dev Mode)';
+      }
+    });
 
     function show(id) { document.getElementById(id).classList.remove('hidden'); }
     function hide(id) { document.getElementById(id).classList.add('hidden'); }
@@ -534,10 +658,9 @@
 
     // Wallet detection
     var KNOWN_WALLETS = [
-      { name: 'Phantom',   icon: 'https://phantom.app/img/phantom-icon-purple.png', check: function() { return window.phantom && window.phantom.solana; } },
-      { name: 'Solflare',  icon: 'https://solflare.com/favicon.ico',                check: function() { return window.solflare; } },
-      { name: 'Backpack',  icon: 'https://backpack.app/favicon.ico',                check: function() { return window.backpack; } },
-      { name: 'OKX',       icon: 'https://www.okx.com/favicon.ico',                 check: function() { return window.okxwallet && window.okxwallet.solana; } },
+      { name: 'Phantom',   icon: '/icons/phantom.png',   check: function() { return window.phantom && window.phantom.solana; } },
+      { name: 'Solflare',  icon: '/icons/solflare.ico',  check: function() { return window.solflare; } },
+      { name: 'Backpack',  icon: '/icons/backpack.ico',  check: function() { return window.backpack; } },
     ];
 
     function detectWallets() {
@@ -606,60 +729,68 @@
       btn.disabled = true;
 
       try {
-        // 1. Pick and connect wallet
-        var provider = await showWalletPicker();
+        var sessionToken = null;
 
-        setStatus('Connecting wallet...', true);
-        var resp = await provider.connect();
-        var pubkey = resp.publicKey;
+        // Payment flow (skip in dev mode)
+        if (!skipPayment) {
+          // 1. Pick and connect wallet
+          var provider = await showWalletPicker();
+          if (!provider) throw new Error('No wallet selected');
 
-        // 2. Get payment info
-        if (!paymentInfo) {
-          var priceRes = await fetch(API + '/api/payment/price');
-          paymentInfo = await priceRes.json();
-        }
+          setStatus('Connecting wallet...', true);
+          var solProvider = provider.solana || provider;
+          var resp = await solProvider.connect();
+          var pubkey = resp.publicKey;
 
-        setStatus('Requesting payment of ' + paymentInfo.solAmount.toFixed(4) + ' SOL...', true);
-
-        // 3. Build and send SOL transfer
-        var connection = new solanaWeb3.Connection(
-          'https://mainnet.helius-rpc.com/?api-key=public',
-          'confirmed'
-        );
-
-        var transaction = new solanaWeb3.Transaction().add(
-          solanaWeb3.SystemProgram.transfer({
-            fromPubkey: pubkey,
-            toPubkey: new solanaWeb3.PublicKey(paymentInfo.treasury),
-            lamports: paymentInfo.lamports,
-          })
-        );
-
-        var bh = await connection.getLatestBlockhash();
-        transaction.recentBlockhash = bh.blockhash;
-        transaction.feePayer = pubkey;
-
-        var signed = await provider.signAndSendTransaction(transaction);
-        var signature = signed.signature;
-
-        // 4. Verify payment with retry
-        setStatus('Confirming payment on-chain...', true);
-        var verifyData = null;
-        for (var attempt = 0; attempt < 5; attempt++) {
-          await new Promise(function(r) { setTimeout(r, 3000); });
-          var verifyRes = await fetch(API + '/api/payment/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ signature: signature, mint: currentAnalysis.mint }),
-          });
-          verifyData = await verifyRes.json();
-          if (verifyData.valid) break;
-          if (verifyData.error && !verifyData.error.includes('not found') && !verifyData.error.includes('not be confirmed')) {
-            break; // real error, don't retry
+          // 2. Get payment info
+          if (!paymentInfo) {
+            var priceRes = await fetch(API + '/api/payment/price');
+            paymentInfo = await priceRes.json();
           }
-          setStatus('Waiting for confirmation (attempt ' + (attempt + 2) + '/5)...', true);
+
+          setStatus('Requesting payment of ' + paymentInfo.solAmount.toFixed(4) + ' SOL...', true);
+
+          // 3. Build and send SOL transfer
+          var connection = new solanaWeb3.Connection(
+            window.location.origin + '/api/rpc',
+            'confirmed'
+          );
+
+          var transaction = new solanaWeb3.Transaction().add(
+            solanaWeb3.SystemProgram.transfer({
+              fromPubkey: pubkey,
+              toPubkey: new solanaWeb3.PublicKey(paymentInfo.treasury),
+              lamports: paymentInfo.lamports,
+            })
+          );
+
+          var bh = await connection.getLatestBlockhash();
+          transaction.recentBlockhash = bh.blockhash;
+          transaction.feePayer = pubkey;
+
+          var signed = await solProvider.signAndSendTransaction(transaction);
+          var signature = signed.signature;
+
+          // 4. Verify payment with retry
+          setStatus('Confirming payment on-chain...', true);
+          var verifyData = null;
+          for (var attempt = 0; attempt < 5; attempt++) {
+            await new Promise(function(r) { setTimeout(r, 3000); });
+            var verifyRes = await fetch(API + '/api/payment/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ signature: signature, mint: currentAnalysis.mint }),
+            });
+            verifyData = await verifyRes.json();
+            if (verifyData.valid) break;
+            if (verifyData.error && !verifyData.error.includes('not found') && !verifyData.error.includes('not be confirmed')) {
+              break;
+            }
+            setStatus('Waiting for confirmation (attempt ' + (attempt + 2) + '/5)...', true);
+          }
+          if (!verifyData || !verifyData.valid) throw new Error(verifyData ? verifyData.error : 'Payment verification failed');
+          sessionToken = verifyData.sessionToken;
         }
-        if (!verifyData || !verifyData.valid) throw new Error(verifyData ? verifyData.error : 'Payment verification failed');
 
         // 5. Scrape links
         setStatus('Scraping links...', true);
@@ -674,13 +805,13 @@
         });
         var scraped = await scrapeRes.json();
 
-        // 6. Generate paid roast
+        // 6. Generate roast
         setStatus('Generating roast...', true);
         var roastRes = await fetch(API + '/api/paid-roast', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            sessionToken: verifyData.sessionToken,
+            sessionToken: sessionToken,
             analysis: currentAnalysis,
             scraped: scraped,
           }),

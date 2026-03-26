@@ -17,8 +17,8 @@ import crypto from "crypto";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
-const TREASURY = new PublicKey("BFibSQsR7QUjcNgkHJELkfPR84att9do5yj5PMVdLtpL");
-const PRICE_USD = 0.50;
+const TREASURY = new PublicKey(process.env.TREASURY_WALLET || "BFibSQsR7QUjcNgkHJELkfPR84att9do5yj5PMVdLtpL");
+const PRICE_USD = parseFloat(process.env.ANALYSIS_PRICE_USD || "0.50");
 /** Allow 10% slippage on SOL price between quote and payment */
 const SLIPPAGE = 0.10;
 

@@ -36,6 +36,7 @@ const env = {
   openaiApiKey: process.env.OPENAI_API_KEY!,
   twitterAuthToken: process.env.TWITTER_AUTH_TOKEN,
   twitterCt0: process.env.TWITTER_CT0,
+  skipPayment: process.env.SKIP_PAYMENT === "true",
   port: Number(process.env.PORT ?? 3000),
 };
 
@@ -47,6 +48,9 @@ app.use("*", cors());
 
 /** Health check */
 app.get("/api/health", (c) => c.json({ status: "ok", service: "bagradar" }));
+
+/** Frontend config — tells the frontend if payment is required */
+app.get("/api/config", (c) => c.json({ skipPayment: env.skipPayment }));
 
 /**
  * Stage 1: Aggregate on-chain + market data for a token mint.
@@ -204,6 +208,20 @@ app.post("/api/card", async (c) => {
 
 // ─── Payment ─────────────────────────────────────────────────────────────────
 
+/** RPC proxy — lets frontend send transactions without exposing API key */
+app.post("/api/rpc", async (c) => {
+  const body = await c.req.text();
+  const res = await fetch(RPC_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body,
+  });
+  const data = await res.text();
+  return new Response(data, {
+    headers: { "Content-Type": "application/json" },
+  });
+});
+
 /** Get current SOL price and payment amount */
 app.get("/api/payment/price", async (c) => {
   const info = await getPaymentAmount();
@@ -241,12 +259,17 @@ app.post("/api/paid-roast", async (c) => {
     scraped?: ScrapedLinks | null;
   }>();
 
-  if (!body.sessionToken || !body.analysis) {
-    return c.json({ error: "sessionToken and analysis are required" }, 400);
+  if (!body.analysis) {
+    return c.json({ error: "analysis is required" }, 400);
   }
 
-  if (!validateSession(body.sessionToken, body.analysis.mint)) {
-    return c.json({ error: "Invalid or expired session. Please pay again." }, 403);
+  if (!env.skipPayment) {
+    if (!body.sessionToken) {
+      return c.json({ error: "sessionToken is required" }, 400);
+    }
+    if (!validateSession(body.sessionToken, body.analysis.mint)) {
+      return c.json({ error: "Invalid or expired session. Please pay again." }, 403);
+    }
   }
 
   const result = await generateRoast(

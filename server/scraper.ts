@@ -75,6 +75,7 @@ export interface LinksToScrape {
 export interface ScraperConfig {
   twitterAuthToken?: string;
   twitterCt0?: string;
+  githubToken?: string;
 }
 
 // ─── GitHub Scraper ──────────────────────────────────────────────────────────
@@ -88,13 +89,17 @@ function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
   return { owner: match[1], repo: match[2].replace(/\.git$/, "") };
 }
 
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "";
+
 async function githubGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${GITHUB_API}${path}`, {
-    headers: {
-      Accept: "application/vnd.github.v3+json",
-      "User-Agent": "BagRadar/1.0",
-    },
-  });
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github.v3+json",
+    "User-Agent": "BagRadar/1.0",
+  };
+  if (GITHUB_TOKEN) {
+    headers["Authorization"] = `Bearer ${GITHUB_TOKEN}`;
+  }
+  const res = await fetch(`${GITHUB_API}${path}`, { headers });
   if (!res.ok) {
     throw new Error(`GitHub API ${path}: ${res.status} ${res.statusText}`);
   }

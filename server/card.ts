@@ -65,16 +65,18 @@ function riskColor(score: number): string {
   return "#22c55e";
 }
 
-// ─── Card Renderer ───────────────────────────────────────────────────────────
+// ─── Card Renderer (vertical / portrait) ─────────────────────────────────────
 
-// Tier-specific background gradients
-const TIER_GRADIENTS: Record<string, string> = {
-  birkin:  "linear-gradient(135deg, #0a1628 0%, #0f2847 50%, #0a1628 100%)",
-  solid:   "linear-gradient(135deg, #0a1a0a 0%, #0f2e14 50%, #0a1a0a 100%)",
-  mystery: "linear-gradient(135deg, #1a1a0a 0%, #2e2a0f 50%, #1a1a0a 100%)",
-  trash:   "linear-gradient(135deg, #1a100a 0%, #2e1a0f 50%, #1a100a 100%)",
-  body:    "linear-gradient(135deg, #1a0a0a 0%, #2e0f0f 50%, #1a0a0a 100%)",
+const TIER_BG: Record<string, { bg: string; glow: string }> = {
+  birkin:  { bg: "linear-gradient(180deg, #060e1f 0%, #0c1e3d 40%, #081428 100%)", glow: "#3b82f6" },
+  solid:   { bg: "linear-gradient(180deg, #061f0a 0%, #0c3d14 40%, #081e0a 100%)", glow: "#22c55e" },
+  mystery: { bg: "linear-gradient(180deg, #1a1706 0%, #332b0c 40%, #1a1706 100%)", glow: "#eab308" },
+  trash:   { bg: "linear-gradient(180deg, #1f0e06 0%, #3d1c0c 40%, #1f0e06 100%)", glow: "#f97316" },
+  body:    { bg: "linear-gradient(180deg, #1f0606 0%, #3d0c0c 40%, #1f0606 100%)", glow: "#ef4444" },
 };
+
+const W = 480;
+const H = 720;
 
 export async function renderCard(input: CardInput): Promise<Buffer> {
   const { analysis, roast } = input;
@@ -82,138 +84,171 @@ export async function renderCard(input: CardInput): Promise<Buffer> {
 
   const m = analysis.market;
   const tier = roast.bagTier;
-  const bg = TIER_GRADIENTS[tier.tier] ?? TIER_GRADIENTS.mystery;
+  const { bg, glow } = TIER_BG[tier.tier] ?? TIER_BG.mystery;
 
-  const markup = {
-    type: "div",
-    props: {
-      style: {
+  const markup = div({
+    display: "flex",
+    flexDirection: "column",
+    width: "100%",
+    height: "100%",
+    background: bg,
+    color: "#ffffff",
+    fontFamily: "Inter",
+    position: "relative",
+    overflow: "hidden",
+  }, [
+    // Glow circle behind tier score
+    div({
+      position: "absolute",
+      top: "-60px",
+      left: "50%",
+      width: "300px",
+      height: "300px",
+      borderRadius: "50%",
+      background: `radial-gradient(circle, ${glow}22 0%, transparent 70%)`,
+      transform: "translateX(-50%)",
+    }),
+
+    // Top bar
+    div({ background: tier.color, height: "3px", width: "100%" }),
+
+    // Content
+    div({
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      padding: "32px 36px 24px",
+      flex: 1,
+    }, [
+      // BAGRADAR brand
+      text("BAGRADAR", {
+        fontSize: 12,
+        fontWeight: 700,
+        color: "#f97316",
+        letterSpacing: "3px",
+        marginBottom: "24px",
+      }),
+
+      // Token image (large, centered)
+      analysis.imageUrl
+        ? { type: "img", props: { src: analysis.imageUrl, width: 88, height: 88, style: { borderRadius: "50%", border: `3px solid ${tier.color}44` } } }
+        : div({
+            width: "88px", height: "88px", borderRadius: "50%",
+            backgroundColor: "#1a1a1a", display: "flex",
+            alignItems: "center", justifyContent: "center",
+            fontSize: 36, fontWeight: 700, border: `3px solid ${tier.color}44`,
+          }, (analysis.symbol ?? "?")[0]),
+
+      // Token name + symbol
+      text(analysis.name ?? "Unknown", { fontSize: 28, fontWeight: 700, marginTop: "14px", textAlign: "center" as const }),
+      text(`$${analysis.symbol ?? "???"}`, { fontSize: 15, color: "#888", marginTop: "2px" }),
+
+      // Risk score - hero element
+      div({
         display: "flex",
-        flexDirection: "column",
-        width: "100%",
-        height: "100%",
-        background: bg,
-        color: "#ffffff",
-        fontFamily: "Inter",
-        padding: "0",
-        position: "relative",
-      },
-      children: [
-        // Top accent bar
-        div({
-          background: tier.color,
-          height: "4px",
-          width: "100%",
+        alignItems: "baseline",
+        gap: "6px",
+        marginTop: "20px",
+      }, [
+        text(String(roast.riskScore), {
+          fontSize: 64, fontWeight: 900, color: tier.color, lineHeight: 1,
         }),
-
-        // Main content
-        div({
-          display: "flex",
-          flexDirection: "column",
-          padding: "36px 44px 28px",
-          flex: 1,
-        }, [
-          // Row 1: Token info + Tier badge
-          div({ display: "flex", alignItems: "center", marginBottom: "20px" }, [
-            // Token image
-            analysis.imageUrl
-              ? { type: "img", props: { src: analysis.imageUrl, width: 64, height: 64, style: { borderRadius: "50%", border: "2px solid #333" } } }
-              : div({
-                  width: "64px", height: "64px", borderRadius: "50%", backgroundColor: "#1f1f1f",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 26, fontWeight: 700, border: "2px solid #333",
-                }, (analysis.symbol ?? "?")[0]),
-            // Name block
-            div({ display: "flex", flexDirection: "column", marginLeft: "16px" }, [
-              text(analysis.name ?? "Unknown", { fontSize: 32, fontWeight: 700, lineHeight: 1.1 }),
-              text(`$${analysis.symbol ?? "???"}`, { fontSize: 16, color: "#888", marginTop: "2px" }),
-            ]),
-            // Tier badge - the hero element
-            div({
-              marginLeft: "auto",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              background: tier.color + "18",
-              border: `2px solid ${tier.color}`,
-              borderRadius: "14px",
-              padding: "12px 24px",
-            }, [
-              text(String(roast.riskScore), { fontSize: 36, fontWeight: 700, color: tier.color, lineHeight: 1 }),
-              text(tier.label, { fontSize: 12, fontWeight: 700, color: tier.color + "cc", marginTop: "4px", textTransform: "uppercase" as const, letterSpacing: "0.5px" }),
-            ]),
-          ]),
-
-          // Row 2: Verdict - big and bold
-          text(roast.verdict, {
-            fontSize: 22,
-            fontWeight: 700,
-            color: tier.color,
-            textTransform: "uppercase" as const,
-            letterSpacing: "0.5px",
-            marginBottom: "16px",
-          }),
-
-          // Row 3: Stats strip
-          div({ display: "flex", gap: "8px", marginBottom: "16px" }, [
-            statChip("PRICE", m ? formatNum(m.priceUsd) : "N/A"),
-            statChip("MCAP", m ? formatNum(m.marketCap) : "N/A"),
-            statChip("VOL 24H", m ? formatNum(m.volume24h) : "N/A"),
-            statChip(
-              "24H",
-              m ? `${m.priceChange24h > 0 ? "+" : ""}${m.priceChange24h.toFixed(1)}%` : "N/A",
-              m ? (m.priceChange24h >= 0 ? "#22c55e" : "#ef4444") : "#888",
-            ),
-            statChip("LIQUIDITY", m ? formatNum(m.liquidityUsd) : "N/A"),
-          ]),
-
-          // Row 4: Roast excerpt
-          div({
-            fontSize: 14,
-            lineHeight: 1.6,
-            color: "#bbb",
-            flex: 1,
-            overflow: "hidden",
-          }, roast.roast.split("\n\n")[0].slice(0, 280) + "..."),
-
-          // Row 5: Footer
-          div({
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginTop: "16px",
-            paddingTop: "14px",
-            borderTop: "1px solid #ffffff14",
-          }, [
-            text(roast.shareLine.slice(0, 80), { fontSize: 12, color: "#666" }),
-            div({ display: "flex", alignItems: "center", gap: "6px" }, [
-              div({
-                width: "8px", height: "8px", borderRadius: "50%",
-                backgroundColor: "#f97316",
-              }),
-              text("BAGRADAR", { fontSize: 16, fontWeight: 700, color: "#f97316", letterSpacing: "1px" }),
-            ]),
-          ]),
+        div({ display: "flex", flexDirection: "column" }, [
+          text("/100", { fontSize: 18, color: tier.color + "88", fontWeight: 700 }),
+          text("RISK", { fontSize: 10, color: "#666", letterSpacing: "1px", marginTop: "2px" }),
         ]),
-      ],
-    },
-  };
+      ]),
+
+      // Tier label
+      div({
+        display: "flex",
+        background: tier.color + "22",
+        border: `1px solid ${tier.color}66`,
+        borderRadius: "20px",
+        padding: "6px 20px",
+        marginTop: "8px",
+      }, text(tier.label.toUpperCase(), {
+        fontSize: 13, fontWeight: 700, color: tier.color, letterSpacing: "1.5px",
+      })),
+
+      // Verdict
+      text(stripEmoji(roast.verdict), {
+        fontSize: 16,
+        fontWeight: 700,
+        color: "#fff",
+        textAlign: "center" as const,
+        marginTop: "18px",
+        textTransform: "uppercase" as const,
+        letterSpacing: "0.3px",
+      }),
+
+      // Stats grid (2x3)
+      div({
+        display: "flex",
+        flexWrap: "wrap" as const,
+        gap: "6px",
+        marginTop: "18px",
+        width: "100%",
+      }, [
+        statChip("PRICE", m ? formatNum(m.priceUsd) : "N/A"),
+        statChip("MCAP", m ? formatNum(m.marketCap) : "N/A"),
+        statChip("VOL 24H", m ? formatNum(m.volume24h) : "N/A"),
+        statChip(
+          "24H",
+          m ? `${m.priceChange24h > 0 ? "+" : ""}${m.priceChange24h.toFixed(1)}%` : "N/A",
+          m ? (m.priceChange24h >= 0 ? "#22c55e" : "#ef4444") : "#888",
+        ),
+        statChip("LIQUIDITY", m ? formatNum(m.liquidityUsd) : "N/A"),
+        statChip("HOLDERS TOP10", analysis.holders ? `${analysis.holders.top10Pct.toFixed(0)}%` : "N/A",
+          analysis.holders && analysis.holders.top10Pct > 80 ? "#ef4444" : "#fff"),
+      ]),
+
+      // Roast excerpt
+      div({
+        fontSize: 12,
+        lineHeight: 1.6,
+        color: "#999",
+        marginTop: "14px",
+        textAlign: "center" as const,
+        flex: 1,
+        overflow: "hidden",
+      }, `"${stripEmoji(roast.roast.split("\n\n")[0]).slice(0, 160)}..."`),
+
+      // Footer
+      div({
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        marginTop: "12px",
+        paddingTop: "12px",
+        borderTop: "1px solid #ffffff10",
+        width: "100%",
+      },
+        text(stripEmoji(roast.shareLine).slice(0, 60), { fontSize: 10, color: "#555", textAlign: "center" as const }),
+      ),
+    ]),
+  ]);
 
   const svg = await satori(markup as any, {
-    width: 800,
-    height: 440,
+    width: W,
+    height: H,
     fonts: [
       { name: "Inter", data: font, weight: 400, style: "normal" },
       { name: "Inter", data: fontBold, weight: 700, style: "normal" },
     ],
   });
 
-  const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 1600 } }); // 2x for crisp
+  const resvg = new Resvg(svg, { fitTo: { mode: "width", value: W * 2 } });
   const pngData = resvg.render();
   return Buffer.from(pngData.asPng());
 }
 
 // ─── Markup helpers ──────────────────────────────────────────────────────────
+
+/** Strip emoji characters that satori can't render */
+function stripEmoji(str: string): string {
+  return str.replace(/[\u{1F600}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1FA00}-\u{1FAFF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu, "").replace(/\s{2,}/g, " ").trim();
+}
 
 function div(style: Record<string, unknown>, children?: unknown): any {
   return { type: "div", props: { style, children } };
@@ -225,12 +260,12 @@ function text(content: string, style: Record<string, unknown> = {}): any {
 
 function statChip(label: string, value: string, valueColor = "#fff") {
   return div({
-    display: "flex", flexDirection: "column",
+    display: "flex", flexDirection: "column", alignItems: "center",
     backgroundColor: "#ffffff08", borderRadius: "8px",
-    padding: "8px 12px", flex: 1,
+    padding: "8px 8px", width: "31%",
     border: "1px solid #ffffff0a",
   }, [
-    text(label, { fontSize: 9, color: "#666", textTransform: "uppercase" as const, marginBottom: "3px", letterSpacing: "0.5px" }),
+    text(label, { fontSize: 8, color: "#666", textTransform: "uppercase" as const, letterSpacing: "0.5px", marginBottom: "2px" }),
     text(value, { fontSize: 14, fontWeight: 700, color: valueColor }),
   ]);
 }
