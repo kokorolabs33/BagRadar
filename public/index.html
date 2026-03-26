@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BagRadar - Solana Token Roaster</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: #0a0a0a;
+      color: #fff;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 48px;
+      padding-top: 20px;
+    }
+    .header h1 {
+      font-size: 48px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #f97316 0%, #ef4444 50%, #f97316 100%);
+      background-size: 200% 200%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: 4px;
+      animation: gradientShift 3s ease infinite;
+    }
+    @keyframes gradientShift {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+    .header .tagline {
+      font-size: 18px;
+      color: #fff;
+      margin-top: 12px;
+      font-weight: 600;
+      animation: fadeInUp 0.6s ease;
+    }
+    .header .desc {
+      font-size: 15px;
+      color: #aaa;
+      margin-top: 12px;
+      max-width: 520px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.7;
+      animation: fadeInUp 0.8s ease;
+    }
+    .header .desc .highlight {
+      color: #f97316;
+      font-weight: 600;
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Tier scale bar */
+    .tier-scale {
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+      margin-top: 24px;
+      max-width: 520px;
+      margin-left: auto;
+      margin-right: auto;
+      border-radius: 12px;
+      overflow: hidden;
+      animation: fadeInUp 1s ease;
+    }
+    .tier-scale-item {
+      flex: 1;
+      padding: 12px 4px;
+      text-align: center;
+      position: relative;
+      transition: transform 0.2s, flex 0.3s;
+      cursor: default;
+    }
+    .tier-scale-item:hover {
+      transform: scaleY(1.08);
+      flex: 1.3;
+    }
+    .tier-scale-item .tier-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #fff;
+    }
+    .tier-scale-item .tier-desc {
+      font-size: 9px;
+      margin-top: 3px;
+      opacity: 0.7;
+      color: #fff;
+    }
+    .tier-scale-arrow {
+      display: flex;
+      justify-content: space-between;
+      max-width: 520px;
+      margin: 6px auto 0;
+      font-size: 10px;
+      color: #666;
+    }
+
+    /* Input area */
+    .input-area {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    .input-area input {
+      flex: 1;
+      padding: 16px 20px;
+      border-radius: 14px;
+      border: 1px solid #333;
+      background: #141414;
+      color: #fff;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .input-area input:focus { border-color: #f97316; box-shadow: 0 0 0 3px #f9731622; }
+    .input-area input::placeholder { color: #555; }
+    .btn {
+      padding: 16px 32px;
+      border-radius: 14px;
+      border: none;
+      background: linear-gradient(135deg, #f97316, #ea580c);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    .btn:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 16px #f9731644; }
+    .btn:active { transform: translateY(0); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+    #analyzeBtn { animation: fadeInUp 1.2s ease, pulse 2s ease-in-out 2s infinite; }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 #f9731644; }
+      50% { box-shadow: 0 0 0 8px #f9731600; }
+    }
+
+    /* Status */
+    .status {
+      text-align: center;
+      padding: 20px;
+      color: #888;
+      font-size: 14px;
+    }
+    .status .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #333;
+      border-top-color: #f97316;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Stage card */
+    .stage-card {
+      background: #141414;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+      border: 1px solid #222;
+    }
+    .stage-card h3 {
+      font-size: 16px;
+      margin-bottom: 16px;
+      color: #ccc;
+    }
+    .data-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .data-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .data-item .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot.ok { background: #22c55e; }
+    .dot.missing { background: #ef4444; }
+    .data-item .label { color: #888; }
+    .data-item .value { color: #fff; font-weight: 500; }
+
+    /* Links input */
+    .links-section {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #222;
+    }
+    .links-section p {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 12px;
+    }
+    .link-input {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .link-input label {
+      width: 70px;
+      font-size: 12px;
+      color: #666;
+      padding-top: 10px;
+      text-align: right;
+    }
+    .link-input input {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #333;
+      background: #1a1a1a;
+      color: #fff;
+      font-size: 13px;
+      outline: none;
+    }
+    .link-input input:focus { border-color: #f97316; }
+
+    /* Roast result */
+    .roast-result {
+      background: #141414;
+      border-radius: 16px;
+      padding: 28px;
+      margin-top: 24px;
+      border: 1px solid #222;
+    }
+    .tier-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 24px;
+      font-weight: 700;
+      font-size: 18px;
+      margin-bottom: 12px;
+    }
+    .verdict {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      text-transform: uppercase;
+    }
+    .roast-text {
+      font-size: 14px;
+      line-height: 1.7;
+      color: #ccc;
+      white-space: pre-wrap;
+    }
+    .share-line {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid #222;
+      font-size: 13px;
+      color: #888;
+    }
+
+    /* Stats bar */
+    .stats-bar {
+      display: flex;
+      gap: 8px;
+      margin: 16px 0;
+      flex-wrap: wrap;
+    }
+    .stat {
+      background: #1a1a1a;
+      border-radius: 8px;
+      padding: 10px 14px;
+      flex: 1;
+      min-width: 100px;
+    }
+    .stat-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    .stat-value {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    /* Token header */
+    .token-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .token-header img {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #1a1a1a;
+    }
+    .token-header .placeholder-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #1a1a1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 700;
+    }
+    .token-name { font-size: 24px; font-weight: 700; }
+    .token-symbol { font-size: 14px; color: #888; }
+
+    .hidden { display: none !important; }
+    .error-text { color: #ef4444; }
+
+    /* Wallet modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 16px;
+      padding: 28px;
+      max-width: 380px;
+      width: 90%;
+    }
+    .modal h3 {
+      font-size: 18px;
+      margin-bottom: 16px;
+    }
+    .wallet-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .wallet-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid #333;
+      background: #222;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      font-size: 14px;
+      font-weight: 500;
+      color: #fff;
+    }
+    .wallet-item:hover { border-color: #f97316; }
+    .wallet-item img { width: 28px; height: 28px; border-radius: 6px; }
+    .no-wallet {
+      margin-top: 16px;
+      font-size: 12px;
+      color: #888;
+      text-align: center;
+    }
+    .no-wallet a { color: #f97316; text-decoration: none; }
+    .no-wallet a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>BAGRADAR</h1>
+      <p class="tagline">AI-Powered Solana Token Intelligence</p>
+      <p class="desc">
+        On-chain data, websites, GitHub, Twitter — we scrape it all and let AI deliver a
+        <span class="highlight">brutally honest verdict</span>.
+        Every token gets a Bag Tier rating.
+      </p>
+      <div class="tier-scale">
+        <div class="tier-scale-item" style="background:#3b82f6">
+          <div class="tier-label">Birkin</div>
+          <div class="tier-desc">Legit</div>
+        </div>
+        <div class="tier-scale-item" style="background:#22c55e">
+          <div class="tier-label">Solid</div>
+          <div class="tier-desc">Decent</div>
+        </div>
+        <div class="tier-scale-item" style="background:#eab308">
+          <div class="tier-label">Mystery</div>
+          <div class="tier-desc">Risky</div>
+        </div>
+        <div class="tier-scale-item" style="background:#f97316">
+          <div class="tier-label">Trash</div>
+          <div class="tier-desc">Danger</div>
+        </div>
+        <div class="tier-scale-item" style="background:#ef4444">
+          <div class="tier-label">Body</div>
+          <div class="tier-desc">Run</div>
+        </div>
+      </div>
+      <div class="tier-scale-arrow">
+        <span>SAFE</span>
+        <span>DANGER</span>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <input type="text" id="mintInput" placeholder="Paste token contract address (CA)" />
+      <button class="btn" id="analyzeBtn">Scan</button>
+    </div>
+
+    <div id="status" class="status hidden"></div>
+
+    <div id="stage1" class="hidden">
+      <div class="stage-card">
+        <h3>Data Collected</h3>
+        <div id="dataGrid" class="data-grid"></div>
+        <div class="links-section">
+          <p>Missing links? Add them for a deeper analysis:</p>
+          <div class="link-input">
+            <label>Twitter</label>
+            <input type="text" id="linkTwitter" placeholder="https://twitter.com/..." />
+          </div>
+          <div class="link-input">
+            <label>Website</label>
+            <input type="text" id="linkWebsite" placeholder="https://..." />
+          </div>
+          <div class="link-input">
+            <label>GitHub</label>
+            <input type="text" id="linkGithub" placeholder="https://github.com/..." />
+          </div>
+          <div id="paymentSection" style="margin-top: 16px; display: flex; align-items: center; justify-content: space-between;">
+            <div id="priceInfo" style="font-size: 13px; color: #888;"></div>
+            <button class="btn" id="roastBtn">Connect Wallet & Pay</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Wallet picker modal -->
+    <div id="walletModal" class="modal-overlay hidden">
+      <div class="modal">
+        <h3>Connect Wallet</h3>
+        <div id="walletList" class="wallet-list"></div>
+        <div class="no-wallet">
+          No wallet? Install <a href="https://phantom.app/" target="_blank">Phantom</a>,
+          <a href="https://solflare.com/" target="_blank">Solflare</a>, or
+          <a href="https://backpack.app/" target="_blank">Backpack</a>
+        </div>
+      </div>
+    </div>
+
+    <div id="roastResult" class="hidden">
+      <div class="roast-result">
+        <div id="tokenHeader" class="token-header"></div>
+        <div id="tierBadge" class="tier-badge"></div>
+        <div id="verdict" class="verdict"></div>
+        <div id="statsBar" class="stats-bar"></div>
+        <div id="roastText" class="roast-text"></div>
+        <div id="shareLine" class="share-line"></div>
+        <div style="margin-top: 20px;">
+          <button class="btn" id="shareXBtn" style="width: 100%; background: #000; border: 1px solid #333;">Share to X</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/buffer.js"></script>
+  <script>window.Buffer = window.buffer.Buffer;</script>
+  <script src="/js/solana-web3.js"></script>
+  <script>
+    const API = '';
+    let currentAnalysis = null;
+    let paymentInfo = null;
+    var skipPayment = false;
+
+    // Check if payment is skipped (dev mode)
+    fetch(API + '/api/config').then(function(r) { return r.json(); }).then(function(cfg) {
+      skipPayment = cfg.skipPayment;
+      if (skipPayment) {
+        document.getElementById('roastBtn').textContent = 'Roast It (Dev Mode)';
+      }
+    });
+
+    function show(id) { document.getElementById(id).classList.remove('hidden'); }
+    function hide(id) { document.getElementById(id).classList.add('hidden'); }
+
+    function setStatus(msg, loading) {
+      const el = document.getElementById('status');
+      el.textContent = '';
+      if (loading) {
+        const spinner = document.createElement('span');
+        spinner.className = 'spinner';
+        el.appendChild(spinner);
+      }
+      el.appendChild(document.createTextNode(msg));
+      show('status');
+    }
+
+    function setError(msg) {
+      const el = document.getElementById('status');
+      el.textContent = '';
+      const span = document.createElement('span');
+      span.className = 'error-text';
+      span.textContent = msg;
+      el.appendChild(span);
+      show('status');
+    }
+
+    function formatNum(n) {
+      if (n >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
+      if (n >= 1e3) return '$' + (n / 1e3).toFixed(1) + 'K';
+      if (n >= 1) return '$' + n.toFixed(2);
+      return '$' + n.toFixed(6);
+    }
+
+    function createDataItem(label, value, ok) {
+      const div = document.createElement('div');
+      div.className = 'data-item';
+
+      const dot = document.createElement('span');
+      dot.className = 'dot ' + (ok ? 'ok' : 'missing');
+      div.appendChild(dot);
+
+      const labelSpan = document.createElement('span');
+      labelSpan.className = 'label';
+      labelSpan.textContent = label + ':';
+      div.appendChild(labelSpan);
+
+      const valueSpan = document.createElement('span');
+      valueSpan.className = 'value';
+      valueSpan.textContent = value || 'Not found';
+      div.appendChild(valueSpan);
+
+      return div;
+    }
+
+    function createStat(label, value, color) {
+      const div = document.createElement('div');
+      div.className = 'stat';
+
+      const labelDiv = document.createElement('div');
+      labelDiv.className = 'stat-label';
+      labelDiv.textContent = label;
+      div.appendChild(labelDiv);
+
+      const valueDiv = document.createElement('div');
+      valueDiv.className = 'stat-value';
+      valueDiv.textContent = value;
+      if (color) valueDiv.style.color = color;
+      div.appendChild(valueDiv);
+
+      return div;
+    }
+
+    // Stage 1: Analyze
+    async function startAnalysis() {
+      const mint = document.getElementById('mintInput').value.trim();
+      if (!mint) return;
+
+      document.getElementById('analyzeBtn').disabled = true;
+      hide('stage1');
+      hide('roastResult');
+      setStatus('Aggregating on-chain data...', true);
+
+      try {
+        const res = await fetch(API + '/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mint: mint }),
+        });
+        if (!res.ok) throw new Error('API error: ' + res.status);
+        currentAnalysis = await res.json();
+        renderStage1(currentAnalysis);
+        hide('status');
+        show('stage1');
+        // Fetch payment price
+        fetch(API + '/api/payment/price').then(function(r) { return r.json(); }).then(function(p) {
+          paymentInfo = p;
+          document.getElementById('priceInfo').textContent =
+            '~' + p.solAmount.toFixed(4) + ' SOL ($' + p.usdPrice.toFixed(2) + ')';
+        });
+      } catch (err) {
+        setError('Error: ' + err.message);
+      } finally {
+        document.getElementById('analyzeBtn').disabled = false;
+      }
+    }
+
+    function renderStage1(a) {
+      const grid = document.getElementById('dataGrid');
+      grid.textContent = '';
+
+      var items = [
+        ['Name', a.name, !!a.name],
+        ['Symbol', a.symbol, !!a.symbol],
+        ['Price', a.market ? formatNum(a.market.priceUsd) : null, !!a.market],
+        ['Market Cap', a.market ? formatNum(a.market.marketCap) : null, !!a.market],
+        ['Volume 24h', a.market ? formatNum(a.market.volume24h) : null, !!a.market],
+        ['Holders', a.holders ? 'Top10: ' + a.holders.top10Pct.toFixed(0) + '%' : null, !!a.holders],
+        ['Risk Score', a.risk ? a.risk.scoreNormalised + '/10' : null, !!a.risk],
+        ['Creator', a.creator ? a.creator.username : null, !!a.creator],
+        ['Twitter', a.socials && a.socials.twitter ? 'Found' : null, !!(a.socials && a.socials.twitter)],
+        ['Website', a.socials && a.socials.website ? 'Found' : null, !!(a.socials && a.socials.website)],
+      ];
+
+      items.forEach(function(item) {
+        grid.appendChild(createDataItem(item[0], item[1], item[2]));
+      });
+
+      // Pre-fill discovered links from DexScreener
+      if (a.socials && a.socials.twitter) document.getElementById('linkTwitter').value = a.socials.twitter;
+      if (a.socials && a.socials.website) document.getElementById('linkWebsite').value = a.socials.website;
+
+      // If we found a website, do a quick scrape to discover more links (GitHub etc)
+      if (a.socials && a.socials.website) {
+        fetch(API + '/api/scrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ website: a.socials.website }),
+        }).then(function(r) { return r.json(); }).then(function(scraped) {
+          if (scraped.website && scraped.website.discoveredLinks) {
+            var d = scraped.website.discoveredLinks;
+            if (d.twitter && !document.getElementById('linkTwitter').value) {
+              document.getElementById('linkTwitter').value = d.twitter;
+            }
+            if (d.github && !document.getElementById('linkGithub').value) {
+              document.getElementById('linkGithub').value = d.github;
+            }
+          }
+        });
+      }
+    }
+
+    // Wallet detection
+    var KNOWN_WALLETS = [
+      { name: 'Phantom',   icon: '/icons/phantom.png',   check: function() { return window.phantom && window.phantom.solana; } },
+      { name: 'Solflare',  icon: '/icons/solflare.ico',  check: function() { return window.solflare; } },
+      { name: 'Backpack',  icon: '/icons/backpack.ico',  check: function() { return window.backpack; } },
+    ];
+
+    function detectWallets() {
+      var found = [];
+      KNOWN_WALLETS.forEach(function(w) {
+        var provider = w.check();
+        if (provider) found.push({ name: w.name, icon: w.icon, provider: provider });
+      });
+      return found;
+    }
+
+    function showWalletPicker() {
+      return new Promise(function(resolve, reject) {
+        var wallets = detectWallets();
+        var listEl = document.getElementById('walletList');
+        listEl.textContent = '';
+
+        if (wallets.length === 0) {
+          var msg = document.createElement('div');
+          msg.style.cssText = 'text-align:center;padding:20px;color:#888;font-size:14px;';
+          msg.textContent = 'No Solana wallet detected. Please install one and refresh.';
+          listEl.appendChild(msg);
+          show('walletModal');
+
+          document.getElementById('walletModal').addEventListener('click', function handler(e) {
+            if (e.target === document.getElementById('walletModal')) {
+              hide('walletModal');
+              document.getElementById('walletModal').removeEventListener('click', handler);
+              reject(new Error('No wallet installed'));
+            }
+          });
+          return;
+        }
+
+        wallets.forEach(function(w) {
+          var item = document.createElement('div');
+          item.className = 'wallet-item';
+          var img = document.createElement('img');
+          img.src = w.icon;
+          img.alt = w.name;
+          item.appendChild(img);
+          item.appendChild(document.createTextNode(w.name));
+          item.addEventListener('click', function() {
+            hide('walletModal');
+            resolve(w.provider);
+          });
+          listEl.appendChild(item);
+        });
+
+        show('walletModal');
+
+        document.getElementById('walletModal').addEventListener('click', function handler(e) {
+          if (e.target === document.getElementById('walletModal')) {
+            hide('walletModal');
+            document.getElementById('walletModal').removeEventListener('click', handler);
+            reject(new Error('Wallet selection cancelled'));
+          }
+        });
+      });
+    }
+
+    // Payment + Scrape + Roast flow
+    async function startRoast() {
+      if (!currentAnalysis) return;
+      var btn = document.getElementById('roastBtn');
+      btn.disabled = true;
+
+      try {
+        var sessionToken = null;
+
+        // Payment flow (skip in dev mode)
+        if (!skipPayment) {
+          // 1. Pick and connect wallet
+          var provider = await showWalletPicker();
+          if (!provider) throw new Error('No wallet selected');
+
+          setStatus('Connecting wallet...', true);
+          var solProvider = provider.solana || provider;
+          var resp = await solProvider.connect();
+          var pubkey = resp.publicKey;
+
+          // 2. Get payment info
+          if (!paymentInfo) {
+            var priceRes = await fetch(API + '/api/payment/price');
+            paymentInfo = await priceRes.json();
+          }
+
+          setStatus('Requesting payment of ' + paymentInfo.solAmount.toFixed(4) + ' SOL...', true);
+
+          // 3. Build and send SOL transfer
+          var connection = new solanaWeb3.Connection(
+            window.location.origin + '/api/rpc',
+            'confirmed'
+          );
+
+          var transaction = new solanaWeb3.Transaction().add(
+            solanaWeb3.SystemProgram.transfer({
+              fromPubkey: pubkey,
+              toPubkey: new solanaWeb3.PublicKey(paymentInfo.treasury),
+              lamports: paymentInfo.lamports,
+            })
+          );
+
+          var bh = await connection.getLatestBlockhash();
+          transaction.recentBlockhash = bh.blockhash;
+          transaction.feePayer = pubkey;
+
+          var signed = await solProvider.signAndSendTransaction(transaction);
+          var signature = signed.signature;
+
+          // 4. Verify payment with retry
+          setStatus('Confirming payment on-chain...', true);
+          var verifyData = null;
+          for (var attempt = 0; attempt < 5; attempt++) {
+            await new Promise(function(r) { setTimeout(r, 3000); });
+            var verifyRes = await fetch(API + '/api/payment/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ signature: signature, mint: currentAnalysis.mint }),
+            });
+            verifyData = await verifyRes.json();
+            if (verifyData.valid) break;
+            if (verifyData.error && !verifyData.error.includes('not found') && !verifyData.error.includes('not be confirmed')) {
+              break;
+            }
+            setStatus('Waiting for confirmation (attempt ' + (attempt + 2) + '/5)...', true);
+          }
+          if (!verifyData || !verifyData.valid) throw new Error(verifyData ? verifyData.error : 'Payment verification failed');
+          sessionToken = verifyData.sessionToken;
+        }
+
+        // 5. Scrape links
+        setStatus('Scraping links...', true);
+        var twitter = document.getElementById('linkTwitter').value.trim() || null;
+        var website = document.getElementById('linkWebsite').value.trim() || null;
+        var github = document.getElementById('linkGithub').value.trim() || null;
+
+        var scrapeRes = await fetch(API + '/api/scrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ twitter: twitter, website: website, github: github }),
+        });
+        var scraped = await scrapeRes.json();
+
+        // 6. Generate roast
+        setStatus('Generating roast...', true);
+        var roastRes = await fetch(API + '/api/paid-roast', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionToken: sessionToken,
+            analysis: currentAnalysis,
+            scraped: scraped,
+          }),
+        });
+        if (!roastRes.ok) {
+          var errBody = await roastRes.json().catch(function() { return {}; });
+          throw new Error(errBody.error || 'Roast generation failed');
+        }
+        var roast = await roastRes.json();
+
+        renderRoast(currentAnalysis, roast);
+        hide('status');
+        show('roastResult');
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function renderRoast(analysis, roast) {
+      // Token header
+      var headerEl = document.getElementById('tokenHeader');
+      headerEl.textContent = '';
+
+      if (analysis.imageUrl) {
+        var img = document.createElement('img');
+        img.src = analysis.imageUrl;
+        img.alt = analysis.name || '';
+        headerEl.appendChild(img);
+      } else {
+        var placeholder = document.createElement('div');
+        placeholder.className = 'placeholder-icon';
+        placeholder.textContent = (analysis.symbol || '?')[0];
+        headerEl.appendChild(placeholder);
+      }
+
+      var nameBlock = document.createElement('div');
+      var nameDiv = document.createElement('div');
+      nameDiv.className = 'token-name';
+      nameDiv.textContent = analysis.name || 'Unknown';
+      nameBlock.appendChild(nameDiv);
+      var symDiv = document.createElement('div');
+      symDiv.className = 'token-symbol';
+      symDiv.textContent = '$' + (analysis.symbol || '???');
+      nameBlock.appendChild(symDiv);
+      headerEl.appendChild(nameBlock);
+
+      // Tier badge
+      var tier = roast.bagTier;
+      var badgeEl = document.getElementById('tierBadge');
+      badgeEl.textContent = tier.emoji + ' ' + tier.label;
+      badgeEl.style.background = tier.color + '22';
+      badgeEl.style.border = '2px solid ' + tier.color;
+      badgeEl.style.color = tier.color;
+
+      // Verdict
+      var verdictEl = document.getElementById('verdict');
+      verdictEl.textContent = roast.verdict;
+      verdictEl.style.color = tier.color;
+
+      // Stats
+      var statsEl = document.getElementById('statsBar');
+      statsEl.textContent = '';
+      var m = analysis.market;
+      var stats = [
+        ['Price', m ? formatNum(m.priceUsd) : 'N/A', null],
+        ['MCap', m ? formatNum(m.marketCap) : 'N/A', null],
+        ['24h Vol', m ? formatNum(m.volume24h) : 'N/A', null],
+        ['24h', m ? (m.priceChange24h > 0 ? '+' : '') + m.priceChange24h.toFixed(1) + '%' : 'N/A',
+          m ? (m.priceChange24h >= 0 ? '#22c55e' : '#ef4444') : '#888'],
+        ['Risk', roast.riskScore + '/100', tier.color],
+      ];
+      stats.forEach(function(s) {
+        statsEl.appendChild(createStat(s[0], s[1], s[2]));
+      });
+
+      // Roast text
+      document.getElementById('roastText').textContent = roast.roast;
+
+      // Share line
+      document.getElementById('shareLine').textContent = roast.shareLine;
+
+      // Store for share
+      currentRoast = roast;
+    }
+
+    var currentRoast = null;
+
+    function shareToX() {
+      if (!currentAnalysis || !currentRoast) return;
+      var tier = currentRoast.bagTier;
+      var name = currentAnalysis.name || 'Unknown';
+      var symbol = currentAnalysis.symbol || '???';
+      var tweetText = tier.emoji + ' ' + name + ' ($' + symbol + ') rated: ' + tier.label + ' (' + currentRoast.riskScore + '/100)\n\n'
+        + '"' + currentRoast.verdict + '"\n\n'
+        + 'Get your bag roasted at @BagRadar_';
+      var url = 'https://x.com/intent/tweet?text=' + encodeURIComponent(tweetText);
+      window.open(url, '_blank');
+    }
+
+    // Event listeners
+    document.getElementById('analyzeBtn').addEventListener('click', startAnalysis);
+    document.getElementById('roastBtn').addEventListener('click', startRoast);
+    document.getElementById('shareXBtn').addEventListener('click', shareToX);
+    document.getElementById('mintInput').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') startAnalysis();
+    });
+  </script>
+</body>
+</html>
