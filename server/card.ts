@@ -67,14 +67,23 @@ function riskColor(score: number): string {
 
 // ─── Card Renderer ───────────────────────────────────────────────────────────
 
+// Tier-specific background gradients
+const TIER_GRADIENTS: Record<string, string> = {
+  birkin:  "linear-gradient(135deg, #0a1628 0%, #0f2847 50%, #0a1628 100%)",
+  solid:   "linear-gradient(135deg, #0a1a0a 0%, #0f2e14 50%, #0a1a0a 100%)",
+  mystery: "linear-gradient(135deg, #1a1a0a 0%, #2e2a0f 50%, #1a1a0a 100%)",
+  trash:   "linear-gradient(135deg, #1a100a 0%, #2e1a0f 50%, #1a100a 100%)",
+  body:    "linear-gradient(135deg, #1a0a0a 0%, #2e0f0f 50%, #1a0a0a 100%)",
+};
+
 export async function renderCard(input: CardInput): Promise<Buffer> {
   const { analysis, roast } = input;
   const [font, fontBold] = await Promise.all([loadFont(), loadFontBold()]);
 
   const m = analysis.market;
-  const r = analysis.risk;
+  const tier = roast.bagTier;
+  const bg = TIER_GRADIENTS[tier.tier] ?? TIER_GRADIENTS.mystery;
 
-  // Build the card markup (satori uses React-like elements as plain objects)
   const markup = {
     type: "div",
     props: {
@@ -83,256 +92,145 @@ export async function renderCard(input: CardInput): Promise<Buffer> {
         flexDirection: "column",
         width: "100%",
         height: "100%",
-        backgroundColor: "#0a0a0a",
+        background: bg,
         color: "#ffffff",
         fontFamily: "Inter",
-        padding: "48px",
+        padding: "0",
+        position: "relative",
       },
       children: [
-        // Header: logo area + token info
-        {
-          type: "div",
-          props: {
-            style: {
+        // Top accent bar
+        div({
+          background: tier.color,
+          height: "4px",
+          width: "100%",
+        }),
+
+        // Main content
+        div({
+          display: "flex",
+          flexDirection: "column",
+          padding: "36px 44px 28px",
+          flex: 1,
+        }, [
+          // Row 1: Token info + Tier badge
+          div({ display: "flex", alignItems: "center", marginBottom: "20px" }, [
+            // Token image
+            analysis.imageUrl
+              ? { type: "img", props: { src: analysis.imageUrl, width: 64, height: 64, style: { borderRadius: "50%", border: "2px solid #333" } } }
+              : div({
+                  width: "64px", height: "64px", borderRadius: "50%", backgroundColor: "#1f1f1f",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 26, fontWeight: 700, border: "2px solid #333",
+                }, (analysis.symbol ?? "?")[0]),
+            // Name block
+            div({ display: "flex", flexDirection: "column", marginLeft: "16px" }, [
+              text(analysis.name ?? "Unknown", { fontSize: 32, fontWeight: 700, lineHeight: 1.1 }),
+              text(`$${analysis.symbol ?? "???"}`, { fontSize: 16, color: "#888", marginTop: "2px" }),
+            ]),
+            // Tier badge - the hero element
+            div({
+              marginLeft: "auto",
               display: "flex",
+              flexDirection: "column",
               alignItems: "center",
-              gap: "20px",
-              marginBottom: "24px",
-            },
-            children: [
-              // Token image
-              analysis.imageUrl
-                ? {
-                    type: "img",
-                    props: {
-                      src: analysis.imageUrl,
-                      width: 72,
-                      height: 72,
-                      style: { borderRadius: "50%" },
-                    },
-                  }
-                : {
-                    type: "div",
-                    props: {
-                      style: {
-                        width: 72,
-                        height: 72,
-                        borderRadius: "50%",
-                        backgroundColor: "#1f1f1f",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 28,
-                        fontWeight: 700,
-                      },
-                      children: (analysis.symbol ?? "?")[0],
-                    },
-                  },
-              // Name + symbol
-              {
-                type: "div",
-                props: {
-                  style: { display: "flex", flexDirection: "column" },
-                  children: [
-                    {
-                      type: "div",
-                      props: {
-                        style: { fontSize: 36, fontWeight: 700 },
-                        children: analysis.name ?? "Unknown Token",
-                      },
-                    },
-                    {
-                      type: "div",
-                      props: {
-                        style: { fontSize: 20, color: "#888888" },
-                        children: `$${analysis.symbol ?? "???"}`,
-                      },
-                    },
-                  ],
-                },
-              },
-              // Degen score badge (right side)
-              {
-                type: "div",
-                props: {
-                  style: {
-                    marginLeft: "auto",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    backgroundColor: "#1a1a1a",
-                    borderRadius: "16px",
-                    padding: "12px 24px",
-                    border: `2px solid ${roast.bagTier.color}`,
-                  },
-                  children: [
-                    {
-                      type: "div",
-                      props: {
-                        style: { fontSize: 28 },
-                        children: roast.bagTier.emoji,
-                      },
-                    },
-                    {
-                      type: "div",
-                      props: {
-                        style: {
-                          fontSize: 14,
-                          fontWeight: 700,
-                          color: roast.bagTier.color,
-                        },
-                        children: roast.bagTier.label,
-                      },
-                    },
-                  ],
-                },
-              },
-            ],
-          },
-        },
+              background: tier.color + "18",
+              border: `2px solid ${tier.color}`,
+              borderRadius: "14px",
+              padding: "12px 24px",
+            }, [
+              text(String(roast.riskScore), { fontSize: 36, fontWeight: 700, color: tier.color, lineHeight: 1 }),
+              text(tier.label, { fontSize: 12, fontWeight: 700, color: tier.color + "cc", marginTop: "4px", textTransform: "uppercase" as const, letterSpacing: "0.5px" }),
+            ]),
+          ]),
 
-        // Verdict
-        {
-          type: "div",
-          props: {
-            style: {
-              fontSize: 24,
-              fontWeight: 700,
-              color: roast.bagTier.color,
-              marginBottom: "20px",
-              textTransform: "uppercase",
-            },
-            children: roast.verdict,
-          },
-        },
+          // Row 2: Verdict - big and bold
+          text(roast.verdict, {
+            fontSize: 22,
+            fontWeight: 700,
+            color: tier.color,
+            textTransform: "uppercase" as const,
+            letterSpacing: "0.5px",
+            marginBottom: "16px",
+          }),
 
-        // Stats row
-        {
-          type: "div",
-          props: {
-            style: {
-              display: "flex",
-              gap: "16px",
-              marginBottom: "24px",
-            },
-            children: [
-              statBox("PRICE", m ? formatNum(m.priceUsd) : "N/A"),
-              statBox("MCAP", m ? formatNum(m.marketCap) : "N/A"),
-              statBox("24H VOL", m ? formatNum(m.volume24h) : "N/A"),
-              statBox(
-                "24H",
-                m ? `${m.priceChange24h > 0 ? "+" : ""}${m.priceChange24h.toFixed(1)}%` : "N/A",
-                m ? (m.priceChange24h >= 0 ? "#22c55e" : "#ef4444") : "#888888",
-              ),
-              statBox(
-                "RISK",
-                r ? `${r.scoreNormalised}/10` : "N/A",
-                r ? riskColor(r.scoreNormalised) : "#888888",
-              ),
-            ],
-          },
-        },
+          // Row 3: Stats strip
+          div({ display: "flex", gap: "8px", marginBottom: "16px" }, [
+            statChip("PRICE", m ? formatNum(m.priceUsd) : "N/A"),
+            statChip("MCAP", m ? formatNum(m.marketCap) : "N/A"),
+            statChip("VOL 24H", m ? formatNum(m.volume24h) : "N/A"),
+            statChip(
+              "24H",
+              m ? `${m.priceChange24h > 0 ? "+" : ""}${m.priceChange24h.toFixed(1)}%` : "N/A",
+              m ? (m.priceChange24h >= 0 ? "#22c55e" : "#ef4444") : "#888",
+            ),
+            statChip("LIQUIDITY", m ? formatNum(m.liquidityUsd) : "N/A"),
+          ]),
 
-        // Roast text (truncated to fit)
-        {
-          type: "div",
-          props: {
-            style: {
-              fontSize: 16,
-              lineHeight: 1.5,
-              color: "#cccccc",
-              flex: 1,
-              overflow: "hidden",
-            },
-            children: roast.roast.slice(0, 400) + (roast.roast.length > 400 ? "..." : ""),
-          },
-        },
+          // Row 4: Roast excerpt
+          div({
+            fontSize: 14,
+            lineHeight: 1.6,
+            color: "#bbb",
+            flex: 1,
+            overflow: "hidden",
+          }, roast.roast.split("\n\n")[0].slice(0, 280) + "..."),
 
-        // Footer
-        {
-          type: "div",
-          props: {
-            style: {
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginTop: "20px",
-              paddingTop: "16px",
-              borderTop: "1px solid #222222",
-            },
-            children: [
-              {
-                type: "div",
-                props: {
-                  style: { fontSize: 14, color: "#555555" },
-                  children: roast.shareLine,
-                },
-              },
-              {
-                type: "div",
-                props: {
-                  style: {
-                    fontSize: 18,
-                    fontWeight: 700,
-                    color: "#f97316",
-                  },
-                  children: "BAGRADAR",
-                },
-              },
-            ],
-          },
-        },
+          // Row 5: Footer
+          div({
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginTop: "16px",
+            paddingTop: "14px",
+            borderTop: "1px solid #ffffff14",
+          }, [
+            text(roast.shareLine.slice(0, 80), { fontSize: 12, color: "#666" }),
+            div({ display: "flex", alignItems: "center", gap: "6px" }, [
+              div({
+                width: "8px", height: "8px", borderRadius: "50%",
+                backgroundColor: "#f97316",
+              }),
+              text("BAGRADAR", { fontSize: 16, fontWeight: 700, color: "#f97316", letterSpacing: "1px" }),
+            ]),
+          ]),
+        ]),
       ],
     },
   };
 
-  // Render to SVG
   const svg = await satori(markup as any, {
     width: 800,
-    height: 500,
+    height: 440,
     fonts: [
       { name: "Inter", data: font, weight: 400, style: "normal" },
       { name: "Inter", data: fontBold, weight: 700, style: "normal" },
     ],
   });
 
-  // SVG → PNG
-  const resvg = new Resvg(svg, {
-    fitTo: { mode: "width", value: 800 },
-  });
+  const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 1600 } }); // 2x for crisp
   const pngData = resvg.render();
   return Buffer.from(pngData.asPng());
 }
 
-// Stat box helper
-function statBox(label: string, value: string, valueColor = "#ffffff") {
-  return {
-    type: "div",
-    props: {
-      style: {
-        display: "flex",
-        flexDirection: "column",
-        backgroundColor: "#1a1a1a",
-        borderRadius: "8px",
-        padding: "10px 16px",
-        flex: 1,
-      },
-      children: [
-        {
-          type: "div",
-          props: {
-            style: { fontSize: 11, color: "#666666", textTransform: "uppercase", marginBottom: "4px" },
-            children: label,
-          },
-        },
-        {
-          type: "div",
-          props: {
-            style: { fontSize: 16, fontWeight: 700, color: valueColor },
-            children: value,
-          },
-        },
-      ],
-    },
-  };
+// ─── Markup helpers ──────────────────────────────────────────────────────────
+
+function div(style: Record<string, unknown>, children?: unknown): any {
+  return { type: "div", props: { style, children } };
+}
+
+function text(content: string, style: Record<string, unknown> = {}): any {
+  return { type: "div", props: { style, children: content } };
+}
+
+function statChip(label: string, value: string, valueColor = "#fff") {
+  return div({
+    display: "flex", flexDirection: "column",
+    backgroundColor: "#ffffff08", borderRadius: "8px",
+    padding: "8px 12px", flex: 1,
+    border: "1px solid #ffffff0a",
+  }, [
+    text(label, { fontSize: 9, color: "#666", textTransform: "uppercase" as const, marginBottom: "3px", letterSpacing: "0.5px" }),
+    text(value, { fontSize: 14, fontWeight: 700, color: valueColor }),
+  ]);
 }

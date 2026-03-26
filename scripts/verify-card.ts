@@ -1,63 +1,72 @@
 /**
  * verify-card.ts
- * Tests share card generation with mock roast data.
+ * Full pipeline: aggregate → scrape → real AI roast → render card.
  *
- * Run: npx tsx scripts/verify-card.ts
- * Output: /tmp/bagradar-card.png
+ * Run: npx tsx scripts/verify-card.ts [optional-mint]
  */
 
 import "dotenv/config";
 import { writeFileSync } from "fs";
 import { aggregateToken } from "../server/aggregator.js";
+import { scrapeAllLinks } from "../server/scraper.js";
+import { generateRoast } from "../server/roast.js";
 import { renderCard } from "../server/card.js";
-import { riskToTier, type RoastResult } from "../server/roast.js";
 
 const heliusApiKey = process.env.HELIUS_API_KEY!;
 const bagsApiKey = process.env.BAGS_API_KEY!;
+const openaiApiKey = process.env.OPENAI_API_KEY!;
+const twitterAuthToken = process.env.TWITTER_AUTH_TOKEN;
+const twitterCt0 = process.env.TWITTER_CT0;
+
+if (!openaiApiKey) {
+  console.error("OPENAI_API_KEY required for real AI roast");
+  process.exit(1);
+}
 
 const MINT = process.argv[2] || "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN";
 const OUT = "/tmp/bagradar-card.png";
 
 async function main() {
-  console.log(`Generating share card for ${MINT}...\n`);
+  console.log("Full pipeline card generation for " + MINT + "\n");
 
-  // Get real analysis data
+  // Stage 1
+  console.log("[1/4] Aggregating...");
   const t0 = Date.now();
   const analysis = await aggregateToken(MINT, { heliusApiKey, bagsApiKey });
-  console.log(`  Aggregated in ${Date.now() - t0}ms — ${analysis.name} (${analysis.symbol})`);
+  console.log("  " + (Date.now() - t0) + "ms — " + analysis.name + " (" + analysis.symbol + ")");
 
-  // Mock roast result (so we don't need OpenAI key)
-  const mockRoast: RoastResult = {
-    roast:
-      `${analysis.name} ($${analysis.symbol}) is sitting at a market cap of $${analysis.market?.marketCap?.toLocaleString() ?? "???"} with ${analysis.holders?.top10Pct?.toFixed(0) ?? "?"}% of supply locked in the top 10 wallets. ` +
-      `The 24h volume is a measly $${analysis.market?.volume24h?.toLocaleString() ?? "0"} — that's barely enough to buy a decent lunch. ` +
-      `Risk score of ${analysis.risk?.scoreNormalised ?? "?"}/10 from RugCheck tells you everything you need to know. ` +
-      `LP locked at ${analysis.risk?.lpLockedPct?.toFixed(2) ?? "0"}%? That liquidity could vanish faster than your dad going to get milk.`,
-    verdict: analysis.risk?.scoreNormalised && analysis.risk.scoreNormalised >= 7
-      ? "Proceed With Extreme Caution"
-      : "Not The Worst I've Seen",
-    riskScore: Math.min(99, Math.max(1, Math.round(
-      (analysis.risk?.scoreNormalised ?? 5) * 8 +
-      (analysis.holders?.top10Pct ?? 50 > 80 ? 20 : 0)
-    ))),
-    bagTier: riskToTier(Math.min(99, Math.max(1, Math.round(
-      (analysis.risk?.scoreNormalised ?? 5) * 8 +
-      (analysis.holders?.top10Pct ?? 50 > 80 ? 20 : 0)
-    )))),
-    shareLine: `${analysis.name} gets a ${analysis.risk?.scoreNormalised ?? "?"}/10 risk score. DYOR.`,
-    model: "mock",
-    tokensUsed: { prompt: 0, completion: 0 },
-  };
-
-  // Render card
+  // Stage 2
+  console.log("[2/4] Scraping links...");
   const t1 = Date.now();
-  const png = await renderCard({ analysis, roast: mockRoast });
-  console.log(`  Card rendered in ${Date.now() - t1}ms (${png.length} bytes)`);
+  const scraped = await scrapeAllLinks(
+    {
+      twitter: analysis.socials.twitter,
+      website: analysis.socials.website,
+      github: null,
+    },
+    { twitterAuthToken, twitterCt0 },
+  );
+  console.log("  " + (Date.now() - t1) + "ms");
 
-  // Save
+  // Stage 3
+  console.log("[3/4] AI Roast...");
+  const t2 = Date.now();
+  const roast = await generateRoast(analysis, { openaiApiKey }, scraped);
+  console.log("  " + (Date.now() - t2) + "ms — " + roast.bagTier.emoji + " " + roast.bagTier.label + " (" + roast.riskScore + "/100)");
+  console.log("  Verdict: " + roast.verdict);
+
+  // Stage 4
+  console.log("[4/4] Rendering card...");
+  const t3 = Date.now();
+  const png = await renderCard({ analysis, roast });
+  console.log("  " + (Date.now() - t3) + "ms (" + png.length + " bytes)");
+
   writeFileSync(OUT, png);
-  console.log(`\n  Saved to: ${OUT}`);
-  console.log(`  Open with: open ${OUT}`);
+
+  // Also copy to public for easy viewing
+  writeFileSync("public/card-preview.png", png);
+  console.log("\n  Saved to: " + OUT);
+  console.log("  View at: http://localhost:3000/card-preview.png");
 }
 
 main().catch((err) => {

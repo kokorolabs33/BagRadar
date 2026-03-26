@@ -369,6 +369,9 @@
         <div id="statsBar" class="stats-bar"></div>
         <div id="roastText" class="roast-text"></div>
         <div id="shareLine" class="share-line"></div>
+        <div style="margin-top: 20px;">
+          <button class="btn" id="shareXBtn" style="width: 100%; background: #000; border: 1px solid #333;">Share to X</button>
+        </div>
       </div>
     </div>
   </div>
@@ -505,9 +508,28 @@
         grid.appendChild(createDataItem(item[0], item[1], item[2]));
       });
 
-      // Pre-fill discovered links
+      // Pre-fill discovered links from DexScreener
       if (a.socials && a.socials.twitter) document.getElementById('linkTwitter').value = a.socials.twitter;
       if (a.socials && a.socials.website) document.getElementById('linkWebsite').value = a.socials.website;
+
+      // If we found a website, do a quick scrape to discover more links (GitHub etc)
+      if (a.socials && a.socials.website) {
+        fetch(API + '/api/scrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ website: a.socials.website }),
+        }).then(function(r) { return r.json(); }).then(function(scraped) {
+          if (scraped.website && scraped.website.discoveredLinks) {
+            var d = scraped.website.discoveredLinks;
+            if (d.twitter && !document.getElementById('linkTwitter').value) {
+              document.getElementById('linkTwitter').value = d.twitter;
+            }
+            if (d.github && !document.getElementById('linkGithub').value) {
+              document.getElementById('linkGithub').value = d.github;
+            }
+          }
+        });
+      }
     }
 
     // Wallet detection
@@ -620,17 +642,24 @@
         var signed = await provider.signAndSendTransaction(transaction);
         var signature = signed.signature;
 
-        // 4. Verify payment
-        setStatus('Confirming payment...', true);
-        await new Promise(function(r) { setTimeout(r, 3000); });
-
-        var verifyRes = await fetch(API + '/api/payment/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ signature: signature, mint: currentAnalysis.mint }),
-        });
-        var verifyData = await verifyRes.json();
-        if (!verifyData.valid) throw new Error(verifyData.error || 'Payment verification failed');
+        // 4. Verify payment with retry
+        setStatus('Confirming payment on-chain...', true);
+        var verifyData = null;
+        for (var attempt = 0; attempt < 5; attempt++) {
+          await new Promise(function(r) { setTimeout(r, 3000); });
+          var verifyRes = await fetch(API + '/api/payment/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ signature: signature, mint: currentAnalysis.mint }),
+          });
+          verifyData = await verifyRes.json();
+          if (verifyData.valid) break;
+          if (verifyData.error && !verifyData.error.includes('not found') && !verifyData.error.includes('not be confirmed')) {
+            break; // real error, don't retry
+          }
+          setStatus('Waiting for confirmation (attempt ' + (attempt + 2) + '/5)...', true);
+        }
+        if (!verifyData || !verifyData.valid) throw new Error(verifyData ? verifyData.error : 'Payment verification failed');
 
         // 5. Scrape links
         setStatus('Scraping links...', true);
@@ -734,11 +763,29 @@
 
       // Share line
       document.getElementById('shareLine').textContent = roast.shareLine;
+
+      // Store for share
+      currentRoast = roast;
+    }
+
+    var currentRoast = null;
+
+    function shareToX() {
+      if (!currentAnalysis || !currentRoast) return;
+      var tier = currentRoast.bagTier;
+      var name = currentAnalysis.name || 'Unknown';
+      var symbol = currentAnalysis.symbol || '???';
+      var tweetText = tier.emoji + ' ' + name + ' ($' + symbol + ') rated: ' + tier.label + ' (' + currentRoast.riskScore + '/100)\n\n'
+        + '"' + currentRoast.verdict + '"\n\n'
+        + 'Get your bag roasted at @BagRadar_';
+      var url = 'https://x.com/intent/tweet?text=' + encodeURIComponent(tweetText);
+      window.open(url, '_blank');
     }
 
     // Event listeners
     document.getElementById('analyzeBtn').addEventListener('click', startAnalysis);
     document.getElementById('roastBtn').addEventListener('click', startRoast);
+    document.getElementById('shareXBtn').addEventListener('click', shareToX);
     document.getElementById('mintInput').addEventListener('keydown', function(e) {
       if (e.key === 'Enter') startAnalysis();
     });
