@@ -17,10 +17,18 @@ import { aggregateToken, type TokenAnalysis } from "./aggregator.js";
 import { scrapeAllLinks, type ScrapedLinks } from "./scraper.js";
 import { generateRoast } from "./roast.js";
 import { renderCard } from "./card.js";
+import {
+  getPaymentAmount,
+  verifyPayment,
+  createSession,
+  validateSession,
+} from "./payment.js";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 const app = new Hono();
+
+const RPC_URL = "https://mainnet.helius-rpc.com/?api-key=" + process.env.HELIUS_API_KEY;
 
 const env = {
   heliusApiKey: process.env.HELIUS_API_KEY!,
@@ -192,6 +200,62 @@ app.post("/api/card", async (c) => {
       "Cache-Control": "public, max-age=3600",
     },
   });
+});
+
+// ─── Payment ─────────────────────────────────────────────────────────────────
+
+/** Get current SOL price and payment amount */
+app.get("/api/payment/price", async (c) => {
+  const info = await getPaymentAmount();
+  return c.json(info);
+});
+
+/**
+ * Verify a SOL payment transaction.
+ * Body: { signature: string, mint: string }
+ * Returns: { valid, sessionToken?, error? }
+ */
+app.post("/api/payment/verify", async (c) => {
+  const body = await c.req.json<{ signature?: string; mint?: string }>();
+  if (!body.signature || !body.mint) {
+    return c.json({ error: "signature and mint are required" }, 400);
+  }
+
+  const result = await verifyPayment(body.signature, RPC_URL);
+
+  if (result.valid && result.sessionToken) {
+    createSession(result.sessionToken, body.mint);
+  }
+
+  return c.json(result);
+});
+
+/**
+ * Paid roast — requires a valid session token from payment verification.
+ * Body: { sessionToken: string, analysis: TokenAnalysis, scraped?: ScrapedLinks }
+ */
+app.post("/api/paid-roast", async (c) => {
+  const body = await c.req.json<{
+    sessionToken?: string;
+    analysis?: TokenAnalysis;
+    scraped?: ScrapedLinks | null;
+  }>();
+
+  if (!body.sessionToken || !body.analysis) {
+    return c.json({ error: "sessionToken and analysis are required" }, 400);
+  }
+
+  if (!validateSession(body.sessionToken, body.analysis.mint)) {
+    return c.json({ error: "Invalid or expired session. Please pay again." }, 403);
+  }
+
+  const result = await generateRoast(
+    body.analysis,
+    { openaiApiKey: env.openaiApiKey },
+    body.scraped,
+  );
+
+  return c.json(result);
 });
 
 // ─── Static files ────────────────────────────────────────────────────────────

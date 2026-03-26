@@ -254,6 +254,58 @@
 
     .hidden { display: none; }
     .error-text { color: #ef4444; }
+
+    /* Wallet modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 16px;
+      padding: 28px;
+      max-width: 380px;
+      width: 90%;
+    }
+    .modal h3 {
+      font-size: 18px;
+      margin-bottom: 16px;
+    }
+    .wallet-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .wallet-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid #333;
+      background: #222;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      font-size: 14px;
+      font-weight: 500;
+      color: #fff;
+    }
+    .wallet-item:hover { border-color: #f97316; }
+    .wallet-item img { width: 28px; height: 28px; border-radius: 6px; }
+    .no-wallet {
+      margin-top: 16px;
+      font-size: 12px;
+      color: #888;
+      text-align: center;
+    }
+    .no-wallet a { color: #f97316; text-decoration: none; }
+    .no-wallet a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -288,9 +340,23 @@
             <label>GitHub</label>
             <input type="text" id="linkGithub" placeholder="https://github.com/..." />
           </div>
-          <div style="margin-top: 16px; text-align: right;">
-            <button class="btn" id="roastBtn">Roast It</button>
+          <div id="paymentSection" style="margin-top: 16px; display: flex; align-items: center; justify-content: space-between;">
+            <div id="priceInfo" style="font-size: 13px; color: #888;"></div>
+            <button class="btn" id="roastBtn">Connect Wallet & Pay</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Wallet picker modal -->
+    <div id="walletModal" class="modal-overlay hidden">
+      <div class="modal">
+        <h3>Connect Wallet</h3>
+        <div id="walletList" class="wallet-list"></div>
+        <div class="no-wallet">
+          No wallet? Install <a href="https://phantom.app/" target="_blank">Phantom</a>,
+          <a href="https://solflare.com/" target="_blank">Solflare</a>, or
+          <a href="https://backpack.app/" target="_blank">Backpack</a>
         </div>
       </div>
     </div>
@@ -307,9 +373,11 @@
     </div>
   </div>
 
+  <script src="https://unpkg.com/@solana/web3.js@1.98.0/lib/index.iife.min.js"></script>
   <script>
     const API = '';
     let currentAnalysis = null;
+    let paymentInfo = null;
 
     function show(id) { document.getElementById(id).classList.remove('hidden'); }
     function hide(id) { document.getElementById(id).classList.add('hidden'); }
@@ -403,6 +471,12 @@
         renderStage1(currentAnalysis);
         hide('status');
         show('stage1');
+        // Fetch payment price
+        fetch(API + '/api/payment/price').then(function(r) { return r.json(); }).then(function(p) {
+          paymentInfo = p;
+          document.getElementById('priceInfo').textContent =
+            '~' + p.solAmount.toFixed(4) + ' SOL ($' + p.usdPrice.toFixed(2) + ')';
+        });
       } catch (err) {
         setError('Error: ' + err.message);
       } finally {
@@ -436,18 +510,134 @@
       if (a.socials && a.socials.website) document.getElementById('linkWebsite').value = a.socials.website;
     }
 
-    // Stage 2 + 3: Scrape + Roast
+    // Wallet detection
+    var KNOWN_WALLETS = [
+      { name: 'Phantom',   icon: 'https://phantom.app/img/phantom-icon-purple.png', check: function() { return window.phantom && window.phantom.solana; } },
+      { name: 'Solflare',  icon: 'https://solflare.com/favicon.ico',                check: function() { return window.solflare; } },
+      { name: 'Backpack',  icon: 'https://backpack.app/favicon.ico',                check: function() { return window.backpack; } },
+      { name: 'OKX',       icon: 'https://www.okx.com/favicon.ico',                 check: function() { return window.okxwallet && window.okxwallet.solana; } },
+    ];
+
+    function detectWallets() {
+      var found = [];
+      KNOWN_WALLETS.forEach(function(w) {
+        var provider = w.check();
+        if (provider) found.push({ name: w.name, icon: w.icon, provider: provider });
+      });
+      return found;
+    }
+
+    function showWalletPicker() {
+      return new Promise(function(resolve, reject) {
+        var wallets = detectWallets();
+        var listEl = document.getElementById('walletList');
+        listEl.textContent = '';
+
+        if (wallets.length === 0) {
+          var msg = document.createElement('div');
+          msg.style.cssText = 'text-align:center;padding:20px;color:#888;font-size:14px;';
+          msg.textContent = 'No Solana wallet detected. Please install one and refresh.';
+          listEl.appendChild(msg);
+          show('walletModal');
+
+          document.getElementById('walletModal').addEventListener('click', function handler(e) {
+            if (e.target === document.getElementById('walletModal')) {
+              hide('walletModal');
+              document.getElementById('walletModal').removeEventListener('click', handler);
+              reject(new Error('No wallet installed'));
+            }
+          });
+          return;
+        }
+
+        wallets.forEach(function(w) {
+          var item = document.createElement('div');
+          item.className = 'wallet-item';
+          var img = document.createElement('img');
+          img.src = w.icon;
+          img.alt = w.name;
+          item.appendChild(img);
+          item.appendChild(document.createTextNode(w.name));
+          item.addEventListener('click', function() {
+            hide('walletModal');
+            resolve(w.provider);
+          });
+          listEl.appendChild(item);
+        });
+
+        show('walletModal');
+
+        document.getElementById('walletModal').addEventListener('click', function handler(e) {
+          if (e.target === document.getElementById('walletModal')) {
+            hide('walletModal');
+            document.getElementById('walletModal').removeEventListener('click', handler);
+            reject(new Error('Wallet selection cancelled'));
+          }
+        });
+      });
+    }
+
+    // Payment + Scrape + Roast flow
     async function startRoast() {
       if (!currentAnalysis) return;
-
-      document.getElementById('roastBtn').disabled = true;
-
-      var twitter = document.getElementById('linkTwitter').value.trim() || null;
-      var website = document.getElementById('linkWebsite').value.trim() || null;
-      var github = document.getElementById('linkGithub').value.trim() || null;
+      var btn = document.getElementById('roastBtn');
+      btn.disabled = true;
 
       try {
+        // 1. Pick and connect wallet
+        var provider = await showWalletPicker();
+
+        setStatus('Connecting wallet...', true);
+        var resp = await provider.connect();
+        var pubkey = resp.publicKey;
+
+        // 2. Get payment info
+        if (!paymentInfo) {
+          var priceRes = await fetch(API + '/api/payment/price');
+          paymentInfo = await priceRes.json();
+        }
+
+        setStatus('Requesting payment of ' + paymentInfo.solAmount.toFixed(4) + ' SOL...', true);
+
+        // 3. Build and send SOL transfer
+        var connection = new solanaWeb3.Connection(
+          'https://mainnet.helius-rpc.com/?api-key=public',
+          'confirmed'
+        );
+
+        var transaction = new solanaWeb3.Transaction().add(
+          solanaWeb3.SystemProgram.transfer({
+            fromPubkey: pubkey,
+            toPubkey: new solanaWeb3.PublicKey(paymentInfo.treasury),
+            lamports: paymentInfo.lamports,
+          })
+        );
+
+        var bh = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = bh.blockhash;
+        transaction.feePayer = pubkey;
+
+        var signed = await provider.signAndSendTransaction(transaction);
+        var signature = signed.signature;
+
+        // 4. Verify payment
+        setStatus('Confirming payment...', true);
+        await new Promise(function(r) { setTimeout(r, 3000); });
+
+        var verifyRes = await fetch(API + '/api/payment/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ signature: signature, mint: currentAnalysis.mint }),
+        });
+        var verifyData = await verifyRes.json();
+        if (!verifyData.valid) throw new Error(verifyData.error || 'Payment verification failed');
+
+        // 5. Scrape links
         setStatus('Scraping links...', true);
+        var twitter = document.getElementById('linkTwitter').value.trim() || null;
+        var website = document.getElementById('linkWebsite').value.trim() || null;
+        var github = document.getElementById('linkGithub').value.trim() || null;
+
         var scrapeRes = await fetch(API + '/api/scrape', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -455,22 +645,30 @@
         });
         var scraped = await scrapeRes.json();
 
+        // 6. Generate paid roast
         setStatus('Generating roast...', true);
-        var roastRes = await fetch(API + '/api/roast', {
+        var roastRes = await fetch(API + '/api/paid-roast', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ analysis: currentAnalysis, scraped: scraped }),
+          body: JSON.stringify({
+            sessionToken: verifyData.sessionToken,
+            analysis: currentAnalysis,
+            scraped: scraped,
+          }),
         });
-        if (!roastRes.ok) throw new Error('Roast API error: ' + roastRes.status);
+        if (!roastRes.ok) {
+          var errBody = await roastRes.json().catch(function() { return {}; });
+          throw new Error(errBody.error || 'Roast generation failed');
+        }
         var roast = await roastRes.json();
 
         renderRoast(currentAnalysis, roast);
         hide('status');
         show('roastResult');
       } catch (err) {
-        setError('Error: ' + err.message);
+        setError(err.message);
       } finally {
-        document.getElementById('roastBtn').disabled = false;
+        btn.disabled = false;
       }
     }
 
