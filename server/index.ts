@@ -23,6 +23,13 @@ import {
   createSession,
   validateSession,
 } from "./payment.js";
+import {
+  initDb,
+  saveShare,
+  getShare,
+  cleanExpiredShares,
+  keepAlive,
+} from "./db.js";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -281,12 +288,170 @@ app.post("/api/paid-roast", async (c) => {
   return c.json(result);
 });
 
+// ─── Share ────────────────────────────────────────────────────────────────────
+
+const SHARE_BASE_URL = process.env.SHARE_BASE_URL || "https://bags.fm";
+
+/**
+ * Save analysis + roast to DB, return share ID.
+ * Body: { analysis: TokenAnalysis, roast: RoastResult }
+ * Response: { id, shareUrl }
+ */
+app.post("/api/share", async (c) => {
+  const body = await c.req.json<{ analysis?: TokenAnalysis; roast?: any }>();
+  if (!body.analysis || !body.roast) {
+    return c.json({ error: "analysis and roast are required" }, 400);
+  }
+
+  const id = await saveShare(body.analysis, body.roast);
+  return c.json({ id, shareUrl: `${SHARE_BASE_URL}/share/${id}` });
+});
+
+/** Get share data as JSON */
+app.get("/api/share/:id", async (c) => {
+  const id = c.req.param("id");
+  const row = await getShare(id);
+  if (!row) return c.json({ error: "Share not found or expired" }, 404);
+  return c.json({ analysis: row.analysis, roast: row.roast, createdAt: row.created_at });
+});
+
+/** Get share card as PNG image (for og:image) */
+app.get("/api/share/:id/card", async (c) => {
+  const id = c.req.param("id");
+  const row = await getShare(id);
+  if (!row) return c.text("Not found", 404);
+
+  const png = await renderCard({
+    analysis: row.analysis as TokenAnalysis,
+    roast: row.roast as any,
+  });
+  return new Response(png, {
+    headers: {
+      "Content-Type": "image/png",
+      "Cache-Control": "public, max-age=3600",
+    },
+  });
+});
+
+/**
+ * Share landing page — returns HTML with OG meta tags so Twitter/X
+ * renders the card image as a preview. The page itself redirects to
+ * the main site with the share data rendered inline.
+ */
+app.get("/share/:id", async (c) => {
+  const id = c.req.param("id");
+  const row = await getShare(id);
+
+  if (!row) {
+    return c.html(`<!DOCTYPE html><html><head>
+      <meta charset="UTF-8">
+      <meta http-equiv="refresh" content="0;url=/">
+      <title>BagRadar</title>
+    </head><body><p>Share expired or not found. Redirecting...</p></body></html>`, 404);
+  }
+
+  const analysis = row.analysis as any;
+  const roast = row.roast as any;
+  const name = analysis.name || "Unknown";
+  const symbol = analysis.symbol || "???";
+  const tier = roast.bagTier?.label || "Unknown";
+  const riskScore = roast.riskScore ?? "?";
+  const verdict = roast.verdict || "";
+  const cardUrl = `${SHARE_BASE_URL}/api/share/${id}/card`;
+  const pageUrl = `${SHARE_BASE_URL}/share/${id}`;
+
+  const title = `${name} ($${symbol}) — ${tier} (${riskScore}/100)`;
+  const description = verdict;
+
+  // Escape HTML entities for safe embedding
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${esc(title)} | BagRadar</title>
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="${esc(title)}" />
+  <meta property="og:description" content="${esc(description)}" />
+  <meta property="og:image" content="${esc(cardUrl)}" />
+  <meta property="og:url" content="${esc(pageUrl)}" />
+  <meta property="og:site_name" content="BagRadar" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@BagRadar_" />
+  <meta name="twitter:title" content="${esc(title)}" />
+  <meta name="twitter:description" content="${esc(description)}" />
+  <meta name="twitter:image" content="${esc(cardUrl)}" />
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', -apple-system, sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+    .container { max-width: 520px; width: 100%; padding: 40px 20px; text-align: center; }
+    .brand { font-size: 14px; font-weight: 700; color: #f97316; letter-spacing: 3px; margin-bottom: 24px; }
+    .card-img { width: 100%; max-width: 480px; border-radius: 16px; margin-bottom: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+    .verdict { font-size: 18px; font-weight: 700; color: #ccc; margin-bottom: 12px; }
+    .roast-text { font-size: 14px; line-height: 1.7; color: #999; white-space: pre-wrap; margin-bottom: 24px; text-align: left; }
+    .expired-note { font-size: 12px; color: #555; margin-bottom: 24px; }
+    .cta-btn {
+      display: inline-block; padding: 14px 32px; border-radius: 14px; border: none;
+      background: linear-gradient(135deg, #f97316, #ea580c); color: #fff;
+      font-size: 15px; font-weight: 700; cursor: pointer; text-decoration: none;
+      transition: all 0.2s; letter-spacing: 0.5px;
+    }
+    .cta-btn:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 16px #f9731644; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="brand">BAGRADAR</div>
+    <img class="card-img" src="/api/share/${esc(id)}/card" alt="${esc(title)}" />
+    <div class="verdict">${esc(verdict)}</div>
+    <div class="roast-text">${esc(roast.roast || "")}</div>
+    <div class="expired-note">Data expires 7 days after generation. Market data is a snapshot at time of analysis.</div>
+    <a class="cta-btn" href="/">Get Your Bag Roasted</a>
+  </div>
+</body>
+</html>`;
+
+  return c.html(html);
+});
+
 // ─── Static files ────────────────────────────────────────────────────────────
 
 app.use("/*", serveStatic({ root: "./public" }));
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 
-serve({ fetch: app.fetch, port: env.port }, (info) => {
-  console.log(`BagRadar API running on http://localhost:${info.port}`);
-});
+// Initialize DB + scheduled tasks, then start server
+(async () => {
+  try {
+    if (process.env.DATABASE_URL) {
+      await initDb();
+
+      // Clean expired shares every hour
+      setInterval(async () => {
+        const n = await cleanExpiredShares();
+        if (n > 0) console.log(`[db] Cleaned ${n} expired shares`);
+      }, 60 * 60 * 1000);
+
+      // Keep database alive — run once every 24h
+      setInterval(async () => {
+        await keepAlive();
+        console.log("[db] Keepalive ping sent");
+      }, 24 * 60 * 60 * 1000);
+    } else {
+      console.warn("[db] DATABASE_URL not set — share feature disabled");
+    }
+  } catch (err) {
+    console.error("[db] Init failed:", err);
+  }
+
+  serve({ fetch: app.fetch, port: env.port }, (info) => {
+    console.log(`BagRadar API running on http://localhost:${info.port}`);
+  });
+})();

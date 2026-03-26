@@ -901,16 +901,41 @@
 
     var currentRoast = null;
 
-    function shareToX() {
+    async function shareToX() {
       if (!currentAnalysis || !currentRoast) return;
-      var tier = currentRoast.bagTier;
-      var name = currentAnalysis.name || 'Unknown';
-      var symbol = currentAnalysis.symbol || '???';
-      var tweetText = tier.emoji + ' ' + name + ' ($' + symbol + ') rated: ' + tier.label + ' (' + currentRoast.riskScore + '/100)\n\n'
-        + '"' + currentRoast.verdict + '"\n\n'
-        + 'Get your bag roasted at @BagRadar_';
-      var url = 'https://x.com/intent/tweet?text=' + encodeURIComponent(tweetText);
-      window.open(url, '_blank');
+
+      var btn = document.getElementById('shareXBtn');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      try {
+        // Save to DB and get share URL
+        var res = await fetch(API + '/api/share', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ analysis: currentAnalysis, roast: currentRoast }),
+        });
+        var shareData = await res.json();
+
+        if (!res.ok || !shareData.shareUrl) {
+          throw new Error(shareData.error || 'Failed to create share link');
+        }
+
+        var tier = currentRoast.bagTier;
+        var name = currentAnalysis.name || 'Unknown';
+        var symbol = currentAnalysis.symbol || '???';
+        var tweetText = tier.emoji + ' ' + name + ' ($' + symbol + ') rated: ' + tier.label + ' (' + currentRoast.riskScore + '/100)\n\n'
+          + '"' + currentRoast.verdict + '"\n\n'
+          + shareData.shareUrl + '\n\n'
+          + 'Get your bag roasted @BagRadar_';
+        var url = 'https://x.com/intent/tweet?text=' + encodeURIComponent(tweetText);
+        window.open(url, '_blank');
+      } catch (err) {
+        alert('Failed to share: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Share to X';
+      }
     }
 
     // Event listeners
